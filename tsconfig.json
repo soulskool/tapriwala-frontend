@@ -30,5 +30,16 @@
     ".next/dev/types/**/*.ts",
     "**/*.mts"
   ],
-  "exclude": ["node_modules"]
+  /*
+   * `tests/` is excluded from the app's type graph on purpose.
+   *
+   * `next build` runs this config, and the constants contract test imports
+   * `../../backend/src/config/constants` — which exists in a full checkout but
+   * not on a server where only the frontend was deployed. Type-checking a test
+   * has no business failing a production build.
+   *
+   * The tests are still fully type-checked: `npm run typecheck` runs
+   * `tsconfig.test.json` straight afterwards.
+   */
+  "exclude": ["node_modules", "tests"]
 }

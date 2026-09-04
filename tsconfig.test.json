@@ -1,0 +1,23 @@
+{
+  /*
+   * Type-checking for the test suite only.
+   *
+   * Kept separate from `tsconfig.json` because `next build` uses that one, and
+   * the constants contract test reaches across into `../backend` — a path that
+   * exists in a full checkout but not on a server where only this app was
+   * deployed. Splitting the two means a deploy can never be blocked by a test
+   * file, while `npm run typecheck` still covers every line of both.
+   */
+  "extends": "./tsconfig.json",
+  "compilerOptions": {
+    "noEmit": true,
+    "types": ["vitest/globals", "@testing-library/jest-dom"]
+  },
+  /*
+   * `exclude` must be restated. It is inherited from the base config, where it
+   * lists "tests" — and since `exclude` filters `include`, leaving it alone
+   * would silently type-check nothing at all here.
+   */
+  "exclude": ["node_modules"],
+  "include": ["tests/**/*.ts", "tests/**/*.tsx", "vitest.config.ts", "vitest.setup.ts"]
+}
