@@ -1,69 +1,71 @@
-import Image from "next/image";
+'use client';
 
-export default function Home() {
+import Link from 'next/link';
+import { useRouter } from 'next/navigation';
+import { useEffect } from 'react';
+
+import { ROLE_HOME, ROLES } from '@/lib/constants';
+import { useAppSelector } from '@/store/hooks';
+
+const ENTRY_POINTS = [
+  {
+    href: ROLE_HOME[ROLES.WAITER],
+    label: 'Floor',
+    icon: '🍽',
+    blurb: 'Live table grid and ordering',
+  },
+  { href: ROLE_HOME[ROLES.KITCHEN], label: 'Kitchen', icon: '👨‍🍳', blurb: 'Live ticket board' },
+  { href: ROLE_HOME[ROLES.BILLING], label: 'Billing', icon: '🧾', blurb: 'Consolidate and close' },
+  { href: ROLE_HOME[ROLES.ADMIN], label: 'Admin', icon: '📊', blurb: 'Overview and master data' },
+];
+
+/**
+ * The root URL.
+ *
+ * Guests never land here — a scanned sticker goes straight to
+ * `/order/<tableCode>`. This is the device that was opened without a bookmark,
+ * so it sends a signed-in operator to their own screen and everyone else to
+ * the PIN pad.
+ */
+export default function HomePage() {
+  const router = useRouter();
+  const user = useAppSelector((state) => state.auth.user);
+
+  useEffect(() => {
+    if (user) router.replace(ROLE_HOME[user.role]);
+  }, [user, router]);
+
   return (
-    <div className="flex flex-col flex-1 items-center justify-center bg-zinc-50 font-sans dark:bg-black">
-      <main className="flex flex-1 w-full max-w-3xl flex-col items-center justify-between py-32 px-16 bg-white dark:bg-black sm:items-start">
-        <Image
-          className="dark:invert h-5 w-[100px]"
-          src="/next.svg"
-          alt="Next.js logo"
-          width={100}
-          height={20}
-          priority
-        />
-        <div className="flex flex-col items-center gap-6 text-center sm:items-start sm:text-left">
-          <h1 className="max-w-xs text-3xl font-semibold leading-10 tracking-tight text-black dark:text-zinc-50">
-            To get started, edit the{" "}
-            <code className="rounded bg-black/[.06] px-1.5 py-0.5 font-mono text-[0.9em] dark:bg-white/[.08]">
-              page.tsx
-            </code>{" "}
-            file.
-          </h1>
-          <p className="max-w-md text-lg leading-8 text-zinc-600 dark:text-zinc-400">
-            Looking for a starting point or more instructions? Head over to{" "}
-            <a
-              href="https://vercel.com/templates?framework=next.js&utm_source=create-next-app&utm_medium=appdir-template-tw&utm_campaign=create-next-app"
-              className="font-medium text-zinc-950 dark:text-zinc-50"
-            >
-              Templates
-            </a>{" "}
-            or the{" "}
-            <a
-              href="https://nextjs.org/learn?utm_source=create-next-app&utm_medium=appdir-template-tw&utm_campaign=create-next-app"
-              className="font-medium text-zinc-950 dark:text-zinc-50"
-            >
-              Learning
-            </a>{" "}
-            center.
-          </p>
+    <main className="mx-auto flex min-h-dvh max-w-2xl flex-col justify-center gap-8 px-5 py-12">
+      <div className="text-center">
+        <div className="bg-brand-600 mx-auto mb-4 flex size-16 items-center justify-center rounded-2xl text-3xl shadow-lg">
+          ☕
         </div>
-        <div className="flex flex-col gap-4 text-base font-medium sm:flex-row">
-          <a
-            className="flex h-12 w-full items-center justify-center gap-2 rounded-full bg-foreground px-5 text-background transition-colors hover:bg-[#383838] dark:hover:bg-[#ccc] md:w-[158px]"
-            href="https://vercel.com/new?utm_source=create-next-app&utm_medium=appdir-template-tw&utm_campaign=create-next-app"
-            target="_blank"
-            rel="noopener noreferrer"
+        <h1 className="text-3xl font-bold tracking-tight">ACD Cafe</h1>
+        <p className="text-ink-muted mt-2">Ordering, kitchen display and billing</p>
+      </div>
+
+      <div className="grid gap-3 sm:grid-cols-2">
+        {ENTRY_POINTS.map((entry) => (
+          <Link
+            key={entry.href}
+            href={entry.href}
+            className="rounded-card border-line bg-surface hover:border-brand-300 hover:bg-brand-50 flex items-center gap-3 border px-4 py-4 transition"
           >
-            <Image
-              className="dark:invert h-[14px] w-4"
-              src="/vercel.svg"
-              alt="Vercel logomark"
-              width={16}
-              height={14}
-            />
-            Deploy Now
-          </a>
-          <a
-            className="flex h-12 w-full items-center justify-center rounded-full border border-solid border-black/[.08] px-5 transition-colors hover:border-transparent hover:bg-black/[.04] dark:border-white/[.145] dark:hover:bg-[#1a1a1a] md:w-[158px]"
-            href="https://nextjs.org/docs?utm_source=create-next-app&utm_medium=appdir-template-tw&utm_campaign=create-next-app"
-            target="_blank"
-            rel="noopener noreferrer"
-          >
-            Documentation
-          </a>
-        </div>
-      </main>
-    </div>
+            <span aria-hidden className="text-2xl">
+              {entry.icon}
+            </span>
+            <span>
+              <span className="block font-semibold">{entry.label}</span>
+              <span className="text-ink-muted block text-sm">{entry.blurb}</span>
+            </span>
+          </Link>
+        ))}
+      </div>
+
+      <p className="text-ink-muted text-center text-sm">
+        Guests scan the QR sticker on their table — no sign-in needed.
+      </p>
+    </main>
   );
 }

@@ -1,26 +1,233 @@
-@import "tailwindcss";
+@import 'tailwindcss';
 
-:root {
-  --background: #ffffff;
-  --foreground: #171717;
+/**
+ * Design tokens.
+ *
+ * Tailwind v4 is configured in CSS, not `tailwind.config.ts` — anything
+ * declared in `@theme` under the `--color-*` namespace becomes a real utility,
+ * so `--color-status-ready` gives you `bg-status-ready`, `text-status-ready`
+ * and `border-status-ready` for free.
+ *
+ * Every table/item status is named here and nowhere else. §5 of the plan
+ * requires the floor to be readable without relying on hue, so each status
+ * also carries a `-ink` (text) and `-soft` (fill) pair that stays legible when
+ * the colour itself is not distinguishable.
+ */
+@theme {
+  /* Brand — warm espresso and amber, the café's own palette */
+  --color-brand-50: #fdf8f3;
+  --color-brand-100: #f7ead9;
+  --color-brand-200: #edd2b0;
+  --color-brand-300: #e0b47f;
+  --color-brand-400: #d1904d;
+  --color-brand-500: #c0752e;
+  --color-brand-600: #a15c23;
+  --color-brand-700: #7c451e;
+  --color-brand-800: #57311a;
+  --color-brand-900: #3a2114;
+
+  /* Neutral surfaces */
+  --color-surface: #ffffff;
+  --color-surface-muted: #f7f6f4;
+  --color-surface-sunken: #efedea;
+  --color-ink: #1c1917;
+  --color-ink-muted: #6b6560;
+  --color-line: #e3dfda;
+
+  /* Table + order status. Paired soft/base/ink so a tile can use all three. */
+  --color-status-empty: #94a3b8;
+  --color-status-empty-soft: #f1f5f9;
+  --color-status-empty-ink: #475569;
+
+  --color-status-occupied: #2563eb;
+  --color-status-occupied-soft: #dbeafe;
+  --color-status-occupied-ink: #1d4ed8;
+
+  --color-status-pending: #d97706;
+  --color-status-pending-soft: #fef3c7;
+  --color-status-pending-ink: #92400e;
+
+  --color-status-preparing: #ea580c;
+  --color-status-preparing-soft: #ffedd5;
+  --color-status-preparing-ink: #9a3412;
+
+  --color-status-ready: #16a34a;
+  --color-status-ready-soft: #dcfce7;
+  --color-status-ready-ink: #15803d;
+
+  --color-status-served: #0d9488;
+  --color-status-served-soft: #ccfbf1;
+  --color-status-served-ink: #0f766e;
+
+  --color-status-bill: #7c3aed;
+  --color-status-bill-soft: #ede9fe;
+  --color-status-bill-ink: #6d28d9;
+
+  --color-status-cancelled: #dc2626;
+  --color-status-cancelled-soft: #fee2e2;
+  --color-status-cancelled-ink: #b91c1c;
+
+  /* Touch targets. A waiter taps this with a thumb, mid-service, one-handed. */
+  --spacing-touch: 2.75rem;
+
+  --radius-card: 0.875rem;
+
+  --animate-pulse-attention: pulse-attention 1.6s ease-in-out infinite;
+  --animate-rise: rise 0.18s ease-out;
 }
 
-@theme inline {
-  --color-background: var(--background);
-  --color-foreground: var(--foreground);
-  --font-sans: var(--font-geist-sans);
-  --font-mono: var(--font-geist-mono);
-}
-
-@media (prefers-color-scheme: dark) {
-  :root {
-    --background: #0a0a0a;
-    --foreground: #ededed;
+@keyframes pulse-attention {
+  0%,
+  100% {
+    box-shadow: 0 0 0 0 rgb(220 38 38 / 0.55);
+  }
+  50% {
+    box-shadow: 0 0 0 0.5rem rgb(220 38 38 / 0);
   }
 }
 
+@keyframes rise {
+  from {
+    opacity: 0;
+    transform: translateY(0.375rem);
+  }
+  to {
+    opacity: 1;
+    transform: none;
+  }
+}
+
+/* ── Base ─────────────────────────────────────────────────────────────────── */
+
+html {
+  /* Staff tap the same buttons hundreds of times a shift; never zoom on tap. */
+  -webkit-text-size-adjust: 100%;
+  touch-action: manipulation;
+}
+
 body {
-  background: var(--background);
-  color: var(--foreground);
-  font-family: Arial, Helvetica, sans-serif;
+  background-color: var(--color-surface-muted);
+  color: var(--color-ink);
+  font-family:
+    ui-sans-serif,
+    system-ui,
+    -apple-system,
+    'Segoe UI',
+    Roboto,
+    'Helvetica Neue',
+    Arial,
+    sans-serif;
+  -webkit-font-smoothing: antialiased;
+}
+
+/* Focus that is visible on a tablet in daylight, not a 1px hairline. */
+:focus-visible {
+  outline: 2px solid var(--color-brand-500);
+  outline-offset: 2px;
+}
+
+/* Respect the guest who asked their phone to stop animating things. */
+@media (prefers-reduced-motion: reduce) {
+  *,
+  *::before,
+  *::after {
+    animation-duration: 0.01ms !important;
+    animation-iteration-count: 1 !important;
+    transition-duration: 0.01ms !important;
+  }
+}
+
+/* ── Utilities ────────────────────────────────────────────────────────────── */
+
+@utility no-scrollbar {
+  scrollbar-width: none;
+  &::-webkit-scrollbar {
+    display: none;
+  }
+}
+
+/* Kitchen tablets are mounted; the board must never bounce-scroll. */
+@utility overscroll-none-y {
+  overscroll-behavior-y: none;
+}
+
+/* ── Print (the counter prints bills from the browser) ────────────────────── */
+
+/*
+ * The receipt is built for an 80mm thermal roll, so it is hidden on screen and
+ * only the printer ever sees it. `auto` height matters: a fixed page size makes
+ * the printer feed a full sheet's worth of blank paper after every short bill.
+ */
+.receipt-sheet {
+  display: none;
+}
+
+@page {
+  size: 80mm auto;
+  margin: 0;
+}
+
+@media print {
+  .print-hidden {
+    display: none !important;
+  }
+
+  body {
+    background: #fff;
+  }
+
+  /*
+   * Everything that is not the receipt goes away. The consolidation table is a
+   * counter working screen — it is 36rem wide and would print across several
+   * curled strips of till roll.
+   */
+  .print-sheet {
+    display: none !important;
+  }
+
+  .receipt-sheet {
+    display: block;
+    width: 72mm; /* 80mm roll less the printer's unprintable margins */
+    margin: 0;
+    padding: 3mm 0 8mm; /* trailing space so the tear-off misses the text */
+    color: #000;
+    font-family: ui-monospace, 'Courier New', monospace;
+  }
+
+  .receipt-body {
+    margin: 0;
+    font-size: 10.5pt;
+    line-height: 1.35;
+    white-space: pre;
+    font-family: inherit;
+  }
+
+  /* The one line the guest actually looks for. */
+  .receipt-total {
+    display: flex;
+    justify-content: space-between;
+    margin: 1mm 0;
+    font-size: 15pt;
+    font-weight: 700;
+  }
+}
+
+/* ── Long menus ───────────────────────────────────────────────────────────── */
+
+/*
+ * The guest menu renders every category at once — 300+ items on one page — so
+ * that finding a vada pav does not require knowing "Vada Pav" is a category.
+ *
+ * `content-visibility: auto` lets the browser skip layout and paint for the
+ * sections currently off-screen, which is what keeps that page opening
+ * instantly on the cheap Android a guest is actually holding.
+ *
+ * `contain-intrinsic-size` gives each skipped section a placeholder height so
+ * the scrollbar does not lurch as sections render on approach. The value is a
+ * rough "one category" guess, not a measurement — being wrong costs a little
+ * scroll drift, being absent costs a jumping page.
+ */
+.menu-section {
+  content-visibility: auto;
+  contain-intrinsic-size: auto 600px;
 }
