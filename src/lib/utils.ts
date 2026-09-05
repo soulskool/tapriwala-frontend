@@ -58,17 +58,26 @@ export function minutesSince(iso: string | null | undefined, now = Date.now()): 
 }
 
 /**
- * "just now" / "8 min" / "1h 05m" — the label on a KDS ticket.
+ * "just now" / "8 min" / "1h 05m" / "1d 01h" — the label on a KDS ticket.
  *
  * Compact on purpose: this sits next to a table code in very large type on a
  * tablet across the kitchen, so it has to stay short at a glance.
+ *
+ * The day tier is not decoration. Without it a table opened at 3pm yesterday
+ * reported "25h 09m", and a table left open over a weekend reported "51h 12m" —
+ * numbers nobody reads as "this has been open since Friday". Hours are padded
+ * in the day form for the same reason minutes are padded in the hour form: the
+ * column must not jitter as the number crosses ten.
  */
 export function formatElapsed(minutes: number): string {
   if (minutes < 1) return 'just now';
   if (minutes < 60) return `${minutes} min`;
+
   const hours = Math.floor(minutes / 60);
-  const rest = minutes % 60;
-  return `${hours}h ${String(rest).padStart(2, '0')}m`;
+  if (hours < 24) return `${hours}h ${String(minutes % 60).padStart(2, '0')}m`;
+
+  const days = Math.floor(hours / 24);
+  return `${days}d ${String(hours % 24).padStart(2, '0')}h`;
 }
 
 /** 7:32 PM — when a round was placed. */
@@ -77,6 +86,34 @@ export function formatClock(iso: string | null | undefined): string {
   const date = new Date(iso);
   if (Number.isNaN(date.getTime())) return '—';
   return date.toLocaleTimeString('en-IN', { hour: 'numeric', minute: '2-digit', hour12: true });
+}
+
+/**
+ * "7:32 PM" today, "7:32 PM · 12 Aug" on any other day.
+ *
+ * For anything stamped with a time a guest or a waiter reads *in the moment* —
+ * a round header, a KOT line. A bare clock is right almost always and badly
+ * wrong exactly when it matters: a table left open overnight showed
+ * "3:27 pm · 25h 09m ago", which reads as this afternoon.
+ *
+ * `now` is a parameter rather than a module constant so this stays a pure
+ * function, and so a test can pin the day without pinning the clock.
+ */
+export function formatClockWithDay(iso: string | null | undefined, now = new Date()): string {
+  if (!iso) return '—';
+  const date = new Date(iso);
+  if (Number.isNaN(date.getTime())) return '—';
+
+  const sameDay =
+    date.getDate() === now.getDate() &&
+    date.getMonth() === now.getMonth() &&
+    date.getFullYear() === now.getFullYear();
+
+  if (sameDay) return formatClock(iso);
+  return `${formatClock(iso)} · ${date.toLocaleDateString('en-IN', {
+    day: 'numeric',
+    month: 'short',
+  })}`;
 }
 
 /** 12 Aug, 7:32 PM — for history lists where the day matters. */

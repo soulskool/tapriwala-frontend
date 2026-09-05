@@ -9,6 +9,10 @@ export const metadata: Metadata = {
     template: '%s · ACD Cafe',
   },
   description: 'Real-time ordering, kitchen display and billing for ACD Cafe.',
+  // The tab icon is `src/app/icon.png` — a file-convention Next picks up on its
+  // own, which is why there is no `icons` key here. It is a 256px render of the
+  // café's logo (`public/icon.svg`); the SVG itself is 5 MB because the artwork
+  // is an embedded photo, and no tab is worth 5 MB on café Wi-Fi.
   // The customer flow is reached by scanning a sticker on a table; there is
   // nothing here for a search engine to index.
   robots: { index: false, follow: false },

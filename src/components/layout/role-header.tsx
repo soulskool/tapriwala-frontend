@@ -26,17 +26,24 @@ interface NavItem {
  * what is happening on the floor.
  */
 const NAV_BY_ROLE: Record<string, NavItem[]> = {
-  [ROLES.WAITER]: [{ href: '/waiter', label: 'Floor', icon: '🍽' }],
+  [ROLES.WAITER]: [
+    { href: '/waiter', label: 'Floor', icon: '🍽' },
+    // Read-only bill history, so a waiter can settle a "what did we pay?"
+    // question at the table rather than at the counter.
+    { href: '/waiter/bills', label: 'Billed', icon: '🧾' },
+  ],
   [ROLES.KITCHEN]: [{ href: '/kitchen', label: 'Kitchen', icon: '👨‍🍳' }],
   [ROLES.BILLING]: [
     { href: '/billing', label: 'Billing', icon: '🧾' },
     { href: '/waiter', label: 'Floor', icon: '🍽' },
+    { href: '/waiter/bills', label: 'Billed', icon: '📒' },
   ],
   [ROLES.ADMIN]: [
     { href: '/admin', label: 'Overview', icon: '📊' },
     { href: '/waiter', label: 'Floor', icon: '🍽' },
     { href: '/kitchen', label: 'Kitchen', icon: '👨‍🍳' },
     { href: '/billing', label: 'Billing', icon: '🧾' },
+    { href: '/waiter/bills', label: 'Billed', icon: '📒' },
     { href: '/admin/products', label: 'Menu', icon: '📋' },
     { href: '/admin/tables', label: 'Tables', icon: '🪑' },
     { href: '/admin/users', label: 'Staff', icon: '👥' },
@@ -64,8 +71,18 @@ export function RoleHeader({ title, confirmSignOut = false }: RoleHeaderProps) {
   const [menuOpen, setMenuOpen] = useState(false);
 
   const nav = user ? (NAV_BY_ROLE[user.role] ?? []) : [];
+  /*
+   * Longest match wins.
+   *
+   * `/waiter/bills` is also a prefix match for `/waiter`, so a plain `find`
+   * would light up "Floor" and title the page "Floor" while the user is
+   * looking at the bill history. Sorting by href length picks the most
+   * specific destination instead.
+   */
   const isActive = (href: string) => pathname === href || pathname.startsWith(`${href}/`);
-  const current = nav.find((item) => isActive(item.href));
+  const current = [...nav]
+    .sort((a, b) => b.href.length - a.href.length)
+    .find((item) => isActive(item.href));
 
   return (
     <header className="border-line bg-surface/95 print-hidden sticky top-0 z-30 border-b backdrop-blur">
@@ -100,10 +117,10 @@ export function RoleHeader({ title, confirmSignOut = false }: RoleHeaderProps) {
             <Link
               key={item.href}
               href={item.href}
-              aria-current={isActive(item.href) ? 'page' : undefined}
+              aria-current={item.href === current?.href ? 'page' : undefined}
               className={cn(
                 'flex min-h-9 items-center gap-1.5 rounded-lg px-2.5 text-sm font-medium whitespace-nowrap transition',
-                isActive(item.href)
+                item.href === current?.href
                   ? 'bg-brand-100 text-brand-800'
                   : 'text-ink-muted hover:bg-surface-sunken hover:text-ink',
               )}
@@ -155,10 +172,10 @@ export function RoleHeader({ title, confirmSignOut = false }: RoleHeaderProps) {
                 <Link
                   href={item.href}
                   onClick={() => setMenuOpen(false)}
-                  aria-current={isActive(item.href) ? 'page' : undefined}
+                  aria-current={item.href === current?.href ? 'page' : undefined}
                   className={cn(
                     'min-h-touch flex items-center gap-3 rounded-lg px-3 text-base font-medium transition',
-                    isActive(item.href)
+                    item.href === current?.href
                       ? 'bg-brand-100 text-brand-800'
                       : 'text-ink hover:bg-surface-sunken',
                   )}

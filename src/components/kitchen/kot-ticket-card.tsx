@@ -1,12 +1,12 @@
 'use client';
 
-import { memo } from 'react';
+import { memo, useState } from 'react';
 
 import { ElapsedTimer } from '@/components/kitchen/elapsed-timer';
 import { useElapsedMinutes, urgencyFor } from '@/hooks/use-elapsed';
 import { ITEM_STATUS, KITCHEN_SETTABLE_STATUSES, type ItemStatus } from '@/lib/constants';
 import type { KdsTicket, KdsTicketItem } from '@/lib/types';
-import { ITEM_STATUS_LABEL, cn, formatClock } from '@/lib/utils';
+import { ITEM_STATUS_LABEL, cn, formatClockWithDay, formatCurrencyShort } from '@/lib/utils';
 
 interface KotTicketCardProps {
   ticket: KdsTicket;
@@ -37,6 +37,17 @@ function KotTicketCardComponent({
   const minutes = useElapsedMinutes(ticket.placedAt);
   const urgency = urgencyFor(minutes);
 
+  /*
+   * Per-item rates stay folded away by default.
+   *
+   * The card's job is still "cook this" — a column of prices next to every
+   * line competes with the quantity, which is the number that must be readable
+   * from across the kitchen. The round total is always on show because that is
+   * what gets shouted over the pass; the breakdown is one tap away for the
+   * times someone actually needs it.
+   */
+  const [showPrices, setShowPrices] = useState(false);
+
   const liveItems = ticket.items.filter((item) => item.status !== ITEM_STATUS.CANCELLED);
   const allReady =
     liveItems.length > 0 &&
@@ -63,11 +74,27 @@ function KotTicketCardComponent({
             ) : null}
           </div>
           <p className="text-ink-muted mt-0.5 text-xs">
-            KOT {ticket.kotId} · {formatClock(ticket.placedAt)} · {ticket.zone}
+            KOT {ticket.kotId} · {formatClockWithDay(ticket.placedAt)} · {ticket.zone}
           </p>
         </div>
 
-        <ElapsedTimer since={ticket.placedAt} className="text-xl" />
+        <div className="flex flex-col items-end gap-1">
+          <ElapsedTimer since={ticket.placedAt} className="text-xl" />
+          <button
+            type="button"
+            onClick={() => setShowPrices((current) => !current)}
+            aria-expanded={showPrices}
+            aria-label={`${showPrices ? 'Hide' : 'Show'} item rates for KOT ${ticket.kotId}`}
+            className={cn(
+              'rounded-lg border px-2 py-0.5 text-sm font-bold tabular-nums transition',
+              showPrices
+                ? 'border-brand-500 bg-brand-50 text-brand-800'
+                : 'border-line text-ink-muted hover:bg-surface-muted',
+            )}
+          >
+            {formatCurrencyShort(ticket.total)}
+          </button>
+        </div>
       </header>
 
       <ul className="divide-line flex flex-1 flex-col divide-y">
@@ -76,10 +103,18 @@ function KotTicketCardComponent({
             key={item.itemId}
             item={item}
             busy={busyItemId === item.itemId}
+            showPrice={showPrices}
             onStatus={(status) => onItemStatus(ticket, item, status)}
           />
         ))}
       </ul>
+
+      {showPrices ? (
+        <p className="border-line text-ink-muted flex items-baseline justify-between border-t px-3 py-2 text-sm tabular-nums">
+          <span>Subtotal {formatCurrencyShort(ticket.subtotal)} + tax</span>
+          <span className="text-ink text-base font-bold">{formatCurrencyShort(ticket.total)}</span>
+        </p>
+      ) : null}
 
       {!allReady ? (
         <footer className="border-line border-t p-2">
@@ -105,10 +140,12 @@ const STATUS_BUTTON_STYLE: Record<string, string> = {
 function TicketItemRow({
   item,
   busy,
+  showPrice,
   onStatus,
 }: {
   item: KdsTicketItem;
   busy: boolean;
+  showPrice: boolean;
   onStatus: (status: ItemStatus) => void;
 }) {
   const done = item.status === ITEM_STATUS.READY || item.status === ITEM_STATUS.SERVED;
@@ -125,6 +162,13 @@ function TicketItemRow({
           <p className={cn('text-lg leading-tight font-bold', cancelled && 'line-through')}>
             {item.displayName}
           </p>
+
+          {showPrice ? (
+            <p className="text-ink-muted mt-0.5 text-sm tabular-nums">
+              {formatCurrencyShort(item.unitPrice)} × {item.quantity} ={' '}
+              <span className="text-ink font-bold">{formatCurrencyShort(item.lineTotal)}</span>
+            </p>
+          ) : null}
 
           {/* Instructions get the loudest treatment on the card — dropping one
               silently is how a guest gets the wrong plate. */}

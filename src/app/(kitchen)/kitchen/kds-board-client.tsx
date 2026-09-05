@@ -2,6 +2,7 @@
 
 import { useMemo, useState } from 'react';
 
+import { BillingNowPanel } from '@/components/kitchen/billing-now-panel';
 import { KotTicketCard } from '@/components/kitchen/kot-ticket-card';
 import { ErrorState, LoadingBlock } from '@/components/ui/feedback';
 import { useNewTicketChime } from '@/hooks/use-new-ticket-chime';
@@ -16,6 +17,7 @@ import { cn } from '@/lib/utils';
 import { apiErrorMessage } from '@/store/api/base-query';
 import { useQueueQuery } from '@/store/api/kitchen-api';
 import { useUpdateItemStatusMutation, useUpdateRoundStatusMutation } from '@/store/api/session-api';
+import { useLiveGridQuery } from '@/store/api/table-api';
 import { useAppDispatch, useAppSelector } from '@/store/hooks';
 import {
   kitchenSoundToggled,
@@ -42,6 +44,10 @@ export function KdsBoardClient() {
   const soundEnabled = useAppSelector((state) => state.ui.kitchenSoundEnabled);
 
   const queue = useQueueQuery();
+  // Called with no argument, like every other live list, so the socket
+  // middleware has exactly one `LiveGrid` cache entry to invalidate — the
+  // waiter floor and this board share it.
+  const grid = useLiveGridQuery();
   const [updateItemStatus] = useUpdateItemStatusMutation();
   const [updateRoundStatus] = useUpdateRoundStatusMutation();
   const [busyItemId, setBusyItemId] = useState<string | null>(null);
@@ -119,6 +125,8 @@ export function KdsBoardClient() {
           {soundEnabled ? '🔔' : '🔕'}
         </button>
       </div>
+
+      <BillingNowPanel tables={grid.data?.tables ?? []} />
 
       <div className="flex-1">
         {queue.isLoading ? (

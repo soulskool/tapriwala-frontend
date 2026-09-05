@@ -1,4 +1,3 @@
-import type { ConsolidatedBill } from '@/lib/types';
 import { formatDateTime } from '@/lib/utils';
 
 /**
@@ -8,12 +7,15 @@ import { formatDateTime } from '@/lib/utils';
  * which is why it is a plain Server Component with no state: printing it is
  * `window.print()` on the page that already has the bill.
  *
- * **This is a customer copy, not a tax invoice.** The GST invoice is still
- * issued by the café's billing software, so nothing here carries the GSTIN or
- * the words "TAX INVOICE" — two systems printing a tax invoice for one sale
- * would mean two invoice numbers against one payment, which is a real problem
- * at filing time rather than a cosmetic one. The tax split is still shown,
- * because the guest is paying it either way and hiding it helps nobody.
+ * **This carries no GSTIN and does not call itself a tax invoice.** It shows
+ * the CGST/SGST split, because the guest is paying it either way and hiding it
+ * helps nobody — but the wording that named the counter as the invoice issuer
+ * was removed on request.
+ *
+ * If this is ever meant to BE the legal invoice, it needs two more things: the
+ * GSTIN in the header and the words "TAX INVOICE". Adding those while the
+ * café's own software also issues one would put two invoice numbers against a
+ * single payment, which is a filing problem rather than a cosmetic one.
  *
  * Monospace and box-drawn on purpose: a thermal printer renders a fixed-width
  * column perfectly and proportional type badly.
@@ -70,10 +72,35 @@ function money(amount: number): string {
   return amount.toFixed(2);
 }
 
+/**
+ * The least a receipt needs.
+ *
+ * Deliberately structural rather than `ConsolidatedBill`: the same paper has to
+ * print from a live table (a consolidation, still changing) and from a saved
+ * `BillingExport` months later (frozen, and with no session number stored on
+ * it). Both satisfy this shape, so neither needs converting into the other.
+ */
+export interface ReceiptData {
+  tableCode: string;
+  /** Absent when reprinting a stored bill — the export does not keep it. */
+  sessionNumber?: number | null;
+  lines: {
+    posName: string;
+    quantity: number;
+    unitPrice: number;
+    taxPercent: number;
+    amount: number;
+    taxAmount: number;
+  }[];
+  subtotal: number;
+  tax: number;
+  total: number;
+}
+
 export interface ReceiptSheetProps {
-  bill: ConsolidatedBill;
+  bill: ReceiptData;
   /** Present once the bill has been generated; absent while it is a preview. */
-  billNumber?: string | undefined;
+  billNumber?: number | undefined;
   printedAt: string;
   /** Stamps "DUPLICATE" — a reprint must be distinguishable from the original. */
   isReprint?: boolean;
@@ -104,7 +131,7 @@ export function ReceiptSheet({ bill, billNumber, printedAt, isReprint }: Receipt
           centre(isReprint ? 'DUPLICATE - CUSTOMER COPY' : 'CUSTOMER COPY'),
           rule('='),
           `TABLE   : ${bill.tableCode}`,
-          `SESSION : ${bill.sessionNumber}`,
+          bill.sessionNumber ? `SESSION : ${bill.sessionNumber}` : '',
           billNumber ? `BILL NO : ${billNumber}` : 'BILL NO : (not generated)',
           `DATE    : ${formatDateTime(printedAt)}`,
           rule(),
@@ -145,10 +172,6 @@ export function ReceiptSheet({ bill, billNumber, printedAt, isReprint }: Receipt
             taxRow(money(rate), money(taxable), money(tax / 2), money(tax / 2)),
           ),
           rule(),
-          '',
-          centre('Not a tax invoice.'),
-          centre('GST bill is issued'),
-          centre('at the counter.'),
           '',
           centre(SHOP.footer),
         ].join('\n')}

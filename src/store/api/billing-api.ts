@@ -88,7 +88,14 @@ export const billingApi = createApi({
 
     listExports: builder.query<
       Paginated<BillingExport>,
-      { status?: ExportStatus; sessionId?: string; page?: number; limit?: number } | void
+      {
+        status?: ExportStatus;
+        sessionId?: string;
+        /** Narrows the history to one table, e.g. "M2". */
+        tableCode?: string;
+        page?: number;
+        limit?: number;
+      } | void
     >({
       query: (params) => ({ url: '/billing/exports', params: params ?? undefined }),
       transformResponse: unwrapPaginated<BillingExport>,

@@ -67,7 +67,7 @@ const PAPER_WIDTH = 32;
 describe('ReceiptSheet paper width', () => {
   it('never emits a line wider than the paper', () => {
     const { container } = render(
-      <ReceiptSheet bill={bill()} billNumber="B-000123" printedAt="2026-09-03T11:20:00.000Z" />,
+      <ReceiptSheet bill={bill()} billNumber={123} printedAt="2026-09-03T11:20:00.000Z" />,
     );
 
     for (const text of printedLines(container)) {
@@ -105,7 +105,7 @@ describe('ReceiptSheet paper width', () => {
           tax: 4848,
           total: 101808,
         })}
-        billNumber="B-000123"
+        billNumber={123}
         printedAt="2026-09-03T11:20:00.000Z"
       />,
     );
@@ -186,7 +186,7 @@ describe('ReceiptSheet content', () => {
     // Two identical-looking receipts for one payment is how a cashier gets
     // accused of pocketing a bill.
     const { container } = render(
-      <ReceiptSheet bill={bill()} billNumber="B-000123" printedAt={printedAt} isReprint />,
+      <ReceiptSheet bill={bill()} billNumber={123} printedAt={printedAt} isReprint />,
     );
     expect(container.textContent).toContain('DUPLICATE');
   });

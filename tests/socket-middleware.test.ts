@@ -74,6 +74,9 @@ function ticket(over: Partial<KdsTicket> = {}): KdsTicket {
     placedAt: '2026-09-03T09:57:35.139Z',
     elapsedMinutes: 0,
     status: 'pending',
+    subtotal: 50,
+    tax: 2.5,
+    total: 52.5,
     items: [
       {
         itemId: 'i1',
@@ -84,6 +87,8 @@ function ticket(over: Partial<KdsTicket> = {}): KdsTicket {
         kitchenStation: 'Beverage',
         status: 'pending',
         unavailable: false,
+        unitPrice: 25,
+        lineTotal: 50,
       },
     ],
     ...over,

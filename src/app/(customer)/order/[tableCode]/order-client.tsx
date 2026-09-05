@@ -3,7 +3,10 @@
 import { useEffect, useMemo, useRef, useState } from 'react';
 
 import { OrderStatusPanel } from '@/components/customer/order-status-panel';
-import { ServiceRequestBar } from '@/components/customer/service-request-bar';
+import {
+  SERVICE_REQUEST_CONFIRMATION,
+  ServiceRequestBar,
+} from '@/components/customer/service-request-bar';
 import { CartDrawer } from '@/components/menu/cart-drawer';
 import { MenuCategoryTabs } from '@/components/menu/menu-category-tabs';
 import { MenuItemCard } from '@/components/menu/menu-item-card';
@@ -12,7 +15,7 @@ import { ConnectionDot } from '@/components/ui/connection-dot';
 import { EmptyState } from '@/components/ui/feedback';
 import { useCart } from '@/hooks/use-cart';
 import { useDebouncedValue } from '@/hooks/use-debounce';
-import { SESSION_STATUS, type ServiceRequestType } from '@/lib/constants';
+import { SERVICE_REQUEST_TYPE, SESSION_STATUS, type ServiceRequestType } from '@/lib/constants';
 import type { MenuCategory, MenuItem, ResolvedTable } from '@/lib/types';
 import { formatCurrency } from '@/lib/utils';
 import { apiErrorMessage } from '@/store/api/base-query';
@@ -59,6 +62,16 @@ export function OrderClient({ tableCode, initialTable, initialMenu }: OrderClien
   const [placeOrder, { isLoading: isPlacing }] = usePlaceOrderMutation();
   const [raiseRequest] = useRaiseServiceRequestMutation();
   const [pendingRequest, setPendingRequest] = useState<ServiceRequestType | null>(null);
+
+  /**
+   * Requests this phone has sent, type → when.
+   *
+   * Deliberately local and unpersisted: it records what *this* guest tapped on
+   * *this* visit, not the table's open requests. A waiter clearing the request
+   * on their own screen must not silently blank the guest's "water is coming" —
+   * the guest dismisses it, or reloads.
+   */
+  const [sentRequests, setSentRequests] = useState<Partial<Record<ServiceRequestType, string>>>({});
 
   const cart = useCart(tableCode);
   const [cartOpen, setCartOpen] = useState(false);
@@ -128,6 +141,17 @@ export function OrderClient({ tableCode, initialTable, initialMenu }: OrderClien
   /** The table is settling a previous group's bill — do not join that bill. */
   const blockedReason = resolved.warning ?? null;
 
+  /**
+   * Once the session itself flips to `bill_requested` the banner below says so,
+   * and saying it twice on one small screen just costs the guest scroll.
+   */
+  const acknowledged = useMemo(() => {
+    if (!billRequested) return sentRequests;
+    const rest = { ...sentRequests };
+    delete rest[SERVICE_REQUEST_TYPE.BILL];
+    return rest;
+  }, [sentRequests, billRequested]);
+
   function handleAdd(item: MenuItem) {
     cart.add(item);
   }
@@ -164,12 +188,10 @@ export function OrderClient({ tableCode, initialTable, initialMenu }: OrderClien
     setPendingRequest(type);
     try {
       await raiseRequest({ tableCode, type }).unwrap();
-      dispatch(
-        toastPushed(
-          type === 'bill' ? 'Bill requested — someone is on their way' : 'Staff have been notified',
-          'success',
-        ),
-      );
+      // Recorded only after the server has it. An optimistic tick here would
+      // tell a guest on dead Wi-Fi that water is coming when nothing was sent.
+      setSentRequests((current) => ({ ...current, [type]: new Date().toISOString() }));
+      dispatch(toastPushed(SERVICE_REQUEST_CONFIRMATION[type], 'success'));
     } catch (error) {
       dispatch(toastPushed(apiErrorMessage(error, 'Could not send that request'), 'error'));
     } finally {
@@ -207,6 +229,14 @@ export function OrderClient({ tableCode, initialTable, initialMenu }: OrderClien
         onRequest={(type) => void handleServiceRequest(type)}
         pending={pendingRequest}
         canRequestBill={Boolean(session)}
+        sent={acknowledged}
+        onDismiss={(type) =>
+          setSentRequests((current) => {
+            const rest = { ...current };
+            delete rest[type];
+            return rest;
+          })
+        }
       />
 
       <OrderStatusPanel rounds={rounds} runningTotal={orderStatus?.totals?.total ?? null} />

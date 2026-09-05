@@ -3,7 +3,7 @@
 import { StatusPill } from '@/components/ui/status-pill';
 import { ITEM_STATUS, type ItemStatus } from '@/lib/constants';
 import type { CustomerRound } from '@/lib/types';
-import { formatClock, formatCurrency, formatElapsed } from '@/lib/utils';
+import { formatClockWithDay, formatCurrency, formatElapsed } from '@/lib/utils';
 
 /**
  * The guest's live view of what they ordered.
@@ -71,7 +71,7 @@ function RoundCard({ round }: { round: CustomerRound }) {
             {round.roundNumber > 1 ? `Added order #${round.roundNumber}` : 'Order'}
           </h3>
           <p className="text-ink-muted text-sm">
-            {formatClock(round.placedAt)} · {formatElapsed(round.elapsedMinutes)} ago
+            {formatClockWithDay(round.placedAt)} · {formatElapsed(round.elapsedMinutes)} ago
           </p>
         </div>
         <StatusPill status={displayStatus} size="md" />

@@ -1,7 +1,9 @@
 'use client';
 
 import Link from 'next/link';
+import { useState } from 'react';
 
+import { CompletedBills } from '@/components/billing/completed-bills';
 import { EmptyState, ErrorState, LoadingBlock } from '@/components/ui/feedback';
 import { StatusPill } from '@/components/ui/status-pill';
 import { SESSION_STATUS } from '@/lib/constants';
@@ -11,14 +13,21 @@ import { apiErrorMessage } from '@/store/api/base-query';
 import { useBillingQueueQuery } from '@/store/api/billing-api';
 import { useLiveGridQuery } from '@/store/api/table-api';
 
+type Tab = 'live' | 'completed';
+
 /**
  * The counter's home screen.
  *
- * Two lists, because §4.4 asks for both: the tables that have actually asked
- * to pay, and every other open session so a biller can settle a table that
- * flagged someone down instead of tapping their phone.
+ * Two lists on the live tab, because §4.4 asks for both: the tables that have
+ * actually asked to pay, and every other open session so a biller can settle a
+ * table that flagged someone down instead of tapping their phone.
+ *
+ * The completed tab is the receipt book — every bill ever generated, kept
+ * because a bill number is a financial record and "find me that bill again" is
+ * a question the counter genuinely asks.
  */
 export function BillingQueueClient() {
+  const [tab, setTab] = useState<Tab>('live');
   const queue = useBillingQueueQuery();
   const grid = useLiveGridQuery();
 
@@ -32,60 +41,110 @@ export function BillingQueueClient() {
       !waitingIds.has(tile.sessionId),
   );
 
-  if (queue.isLoading) return <LoadingBlock label="Loading the counter…" />;
-  if (queue.isError) {
+  return (
+    <div className="flex flex-col gap-6">
+      <div role="tablist" aria-label="Billing views" className="print-hidden flex gap-2">
+        <TabButton active={tab === 'live'} onClick={() => setTab('live')}>
+          Open tables
+          {waiting.length > 0 ? (
+            <span className="bg-status-bill-soft text-status-bill-ink ml-2 rounded-full px-2 py-0.5 text-sm tabular-nums">
+              {waiting.length}
+            </span>
+          ) : null}
+        </TabButton>
+        <TabButton active={tab === 'completed'} onClick={() => setTab('completed')}>
+          Completed bills
+        </TabButton>
+      </div>
+
+      {tab === 'completed' ? <CompletedBills /> : <LiveTab />}
+    </div>
+  );
+
+  function LiveTab() {
+    if (queue.isLoading) return <LoadingBlock label="Loading the counter…" />;
+    if (queue.isError) {
+      return (
+        <ErrorState
+          message={apiErrorMessage(queue.error, 'Could not load the billing queue')}
+          onRetry={() => void queue.refetch()}
+        />
+      );
+    }
+
     return (
-      <ErrorState
-        message={apiErrorMessage(queue.error, 'Could not load the billing queue')}
-        onRetry={() => void queue.refetch()}
-      />
+      <div className="flex flex-col gap-8">
+        <section aria-label="Waiting to be billed" className="flex flex-col gap-3">
+          <h2 className="text-lg font-bold">
+            Asked for the bill
+            <span className="bg-status-bill-soft text-status-bill-ink ml-2 rounded-full px-2 py-0.5 text-sm tabular-nums">
+              {waiting.length}
+            </span>
+          </h2>
+
+          {waiting.length === 0 ? (
+            <EmptyState
+              icon="🧾"
+              title="Nobody is waiting to pay"
+              description="Tables appear here the moment a guest or waiter requests the bill."
+            />
+          ) : (
+            <ul className="grid gap-2.5 sm:grid-cols-2 xl:grid-cols-3">
+              {waiting.map((entry) => (
+                <BillingQueueCard key={entry.sessionId} entry={entry} />
+              ))}
+            </ul>
+          )}
+        </section>
+
+        <section aria-label="Other open tables" className="flex flex-col gap-3">
+          <h2 className="text-lg font-bold">
+            Other open tables
+            <span className="text-ink-muted ml-2 text-sm font-normal tabular-nums">
+              {otherOpen.length}
+            </span>
+          </h2>
+
+          {otherOpen.length === 0 ? (
+            <EmptyState icon="✓" title="No other tables are open" />
+          ) : (
+            <ul className="grid gap-2.5 sm:grid-cols-2 xl:grid-cols-4">
+              {otherOpen.map((tile) => (
+                <OpenTableCard key={tile.tableId} tile={tile} />
+              ))}
+            </ul>
+          )}
+        </section>
+      </div>
     );
   }
+}
 
+/** A tab that stays legible without relying on colour alone. */
+function TabButton({
+  active,
+  onClick,
+  children,
+}: {
+  active: boolean;
+  onClick: () => void;
+  children: React.ReactNode;
+}) {
   return (
-    <div className="flex flex-col gap-8">
-      <section aria-label="Waiting to be billed" className="flex flex-col gap-3">
-        <h2 className="text-lg font-bold">
-          Asked for the bill
-          <span className="bg-status-bill-soft text-status-bill-ink ml-2 rounded-full px-2 py-0.5 text-sm tabular-nums">
-            {waiting.length}
-          </span>
-        </h2>
-
-        {waiting.length === 0 ? (
-          <EmptyState
-            icon="🧾"
-            title="Nobody is waiting to pay"
-            description="Tables appear here the moment a guest or waiter requests the bill."
-          />
-        ) : (
-          <ul className="grid gap-2.5 sm:grid-cols-2 xl:grid-cols-3">
-            {waiting.map((entry) => (
-              <BillingQueueCard key={entry.sessionId} entry={entry} />
-            ))}
-          </ul>
-        )}
-      </section>
-
-      <section aria-label="Other open tables" className="flex flex-col gap-3">
-        <h2 className="text-lg font-bold">
-          Other open tables
-          <span className="text-ink-muted ml-2 text-sm font-normal tabular-nums">
-            {otherOpen.length}
-          </span>
-        </h2>
-
-        {otherOpen.length === 0 ? (
-          <EmptyState icon="✓" title="No other tables are open" />
-        ) : (
-          <ul className="grid gap-2.5 sm:grid-cols-2 xl:grid-cols-4">
-            {otherOpen.map((tile) => (
-              <OpenTableCard key={tile.tableId} tile={tile} />
-            ))}
-          </ul>
-        )}
-      </section>
-    </div>
+    <button
+      type="button"
+      role="tab"
+      aria-selected={active}
+      onClick={onClick}
+      className={cn(
+        'min-h-touch rounded-card border px-4 py-2 font-semibold transition-colors',
+        active
+          ? 'border-brand-600 bg-brand-600 text-white'
+          : 'border-line bg-surface text-ink-muted hover:bg-surface-muted',
+      )}
+    >
+      {children}
+    </button>
   );
 }
 

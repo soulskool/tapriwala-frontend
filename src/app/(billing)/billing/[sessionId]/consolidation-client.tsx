@@ -8,7 +8,7 @@ import { BillSummary } from '@/components/billing/bill-summary';
 import { ConsolidatedLineItem } from '@/components/billing/consolidated-line-item';
 import { ReceiptSheet } from '@/components/billing/receipt-sheet';
 import { Button } from '@/components/ui/button';
-import { TextAreaField, TextField } from '@/components/ui/field';
+import { TextAreaField } from '@/components/ui/field';
 import { ErrorState, LoadingBlock } from '@/components/ui/feedback';
 import { Modal } from '@/components/ui/modal';
 import { EXPORT_METHOD, EXPORT_STATUS, SESSION_STATUS } from '@/lib/constants';
@@ -20,10 +20,27 @@ import {
   useConfirmExportMutation,
   useConsolidateQuery,
   useExportBillMutation,
+  useListExportsQuery,
 } from '@/store/api/billing-api';
 import { useCloseSessionMutation, useSessionDetailQuery } from '@/store/api/session-api';
 import { useAppDispatch } from '@/store/hooks';
 import { toastPushed } from '@/store/slices/ui-slice';
+
+/**
+ * A stable fingerprint of what is being charged for.
+ *
+ * Sorted, so the order the server happens to return lines in can never make an
+ * unchanged bill look changed.
+ */
+function signature(
+  lines: { productCode: string; quantity: number; unitPrice: number }[],
+  total: number,
+): string {
+  return `${total}|${lines
+    .map((line) => `${line.productCode}:${line.quantity}:${line.unitPrice}`)
+    .sort()
+    .join(',')}`;
+}
 
 /**
  * The counter screen (§4.4).
@@ -39,18 +56,47 @@ export function ConsolidationClient({ sessionId }: { sessionId: string }) {
   const bill = useConsolidateQuery(sessionId);
   const detail = useSessionDetailQuery(sessionId);
 
+  /**
+   * The bill already saved for this session, if any.
+   *
+   * Without this the bill number lived only in component state, so a reload —
+   * or opening a closed table from the Billed list — printed a receipt reading
+   * "BILL NO : (not generated)" for a bill that very much had been.
+   */
+  const saved = useListExportsQuery({ sessionId, limit: 1 });
+
   const [exportBill, { isLoading: isExporting }] = useExportBillMutation();
   const [confirmExport] = useConfirmExportMutation();
   const [closeSession, { isLoading: isClosing }] = useCloseSessionMutation();
 
   const [lastExport, setLastExport] = useState<BillingExport | null>(null);
-  const [posReference, setPosReference] = useState('');
   const [closeOpen, setCloseOpen] = useState(false);
   const [closeNote, setCloseNote] = useState('');
   const [freeOpen, setFreeOpen] = useState(false);
   const [freeReason, setFreeReason] = useState('');
   const [printCount, setPrintCount] = useState(0);
   const [printedAt, setPrintedAt] = useState<string | null>(null);
+
+  /** What this session has actually been billed as — fresh result, else stored. */
+  const savedBill = lastExport ?? saved.data?.items[0] ?? null;
+
+  /**
+   * Has the table ordered since the bill was saved?
+   *
+   * A saved bill is frozen — that is the point of it — so a guest who adds a
+   * coffee after "Generate bill" leaves the counter holding a bill for the old
+   * total. Taking payment on that charges the wrong amount, which is the worst
+   * bug this screen could have, so the answer to it is computed rather than
+   * left to whoever is at the counter to notice.
+   *
+   * Compared on codes and quantities, not just the total: two items swapped for
+   * two others at the same price is still a different bill.
+   */
+  const isStale = Boolean(
+    savedBill &&
+    bill.data &&
+    signature(savedBill.lineItems, savedBill.total) !== signature(bill.data.lines, bill.data.total),
+  );
 
   /**
    * Prints the 80mm receipt.
@@ -77,46 +123,79 @@ export function ConsolidationClient({ sessionId }: { sessionId: string }) {
       }).unwrap();
 
       setLastExport(result.export);
-      dispatch(
-        toastPushed(
-          result.export.exportStatus === EXPORT_STATUS.FAILED
-            ? `Bill ${result.export.billNumber} created, but the POS hand-off failed. Enter it manually and confirm.`
-            : `Bill ${result.export.billNumber} ready`,
-          result.export.exportStatus === EXPORT_STATUS.FAILED ? 'error' : 'success',
-        ),
-      );
+      dispatch(toastPushed(`Bill ${result.export.billNumber} saved`, 'success'));
     } catch (error) {
       dispatch(toastPushed(apiErrorMessage(error, 'Could not generate the bill'), 'error'));
     }
   }
 
-  async function handleConfirmPos() {
-    if (!lastExport) return;
-    try {
-      const updated = await confirmExport({
-        id: lastExport._id,
-        exportStatus: EXPORT_STATUS.CONFIRMED,
-        ...(posReference.trim() ? { posReferenceId: posReference.trim() } : {}),
-      }).unwrap();
-      setLastExport(updated);
-      dispatch(toastPushed('Recorded against the POS invoice', 'success'));
-    } catch (error) {
-      dispatch(toastPushed(apiErrorMessage(error, 'Could not record that'), 'error'));
-    }
-  }
-
+  /**
+   * Payment taken: save the bill, mark it paid, free the table.
+   *
+   * There is no POS to hand anything to — this portal *is* the bill — so all
+   * three happen on one press rather than making the counter remember to
+   * generate first. Closing without generating used to leave a table with no
+   * saved copy at all, which is the one outcome you can never reconstruct
+   * afterwards.
+   *
+   * `confirmed` no longer means "entered in the legacy POS", because there is
+   * no legacy POS to enter it into. It means the counter took the money and
+   * closed the table, and `confirmedAt` is when. The field and its endpoint are
+   * left alone so a real POS integration can reclaim the original meaning.
+   */
   async function handleClose() {
     try {
+      // A stale bill is discarded rather than paid: the guest ordered after it
+      // was saved, so a new one is generated for what they actually had. The
+      // old bill keeps its number and stays in Billed — nothing is deleted —
+      // it simply never becomes the one marked paid.
+      let record = isStale ? null : savedBill;
+
+      // An empty table has nothing to bill — the server refuses that, and
+      // rightly. It closes with no export, exactly as it always did.
+      if (!record && (bill.data?.lines.length ?? 0) > 0) {
+        const result = await exportBill({
+          sessionId,
+          method: EXPORT_METHOD.MANUAL_DISPLAY,
+        }).unwrap();
+        record = result.export;
+        setLastExport(result.export);
+      }
+
+      /*
+       * Close first, mark paid second — never the other way round.
+       *
+       * The server refuses to close a table the kitchen has not finished, so
+       * this call really can fail. Confirming first meant a failed close left
+       * behind a bill stamped *paid* against a table that was still open and
+       * still owed food. Ordered this way the worst case is a bill saved but
+       * not settled, which reads correctly on every screen and is fixed by
+       * pressing the button again.
+       */
       await closeSession({
         sessionId,
-        ...(lastExport ? { billingExportId: lastExport._id } : {}),
+        ...(record ? { billingExportId: record._id } : {}),
         ...(closeNote.trim() ? { note: closeNote.trim() } : {}),
         // A session held for manager review needs an explicit override, so the
         // discrepancy is acknowledged rather than absorbed.
         ...(bill.data?.requiresReview ? { force: true } : {}),
       }).unwrap();
 
-      dispatch(toastPushed('Table closed and free', 'success'));
+      if (record && record.exportStatus !== EXPORT_STATUS.CONFIRMED) {
+        record = await confirmExport({
+          id: record._id,
+          exportStatus: EXPORT_STATUS.CONFIRMED,
+          ...(closeNote.trim() ? { note: closeNote.trim() } : {}),
+        }).unwrap();
+        setLastExport(record);
+      }
+
+      dispatch(
+        toastPushed(
+          record ? `Bill ${record.billNumber} saved · table closed` : 'Table closed and free',
+          'success',
+        ),
+      );
       router.push('/billing');
     } catch (error) {
       dispatch(toastPushed(apiErrorMessage(error, 'Could not close the session'), 'error'));
@@ -171,7 +250,7 @@ export function ConsolidationClient({ sessionId }: { sessionId: string }) {
       {/* Screen-invisible; `@media print` is the only thing that reveals it. */}
       <ReceiptSheet
         bill={data}
-        billNumber={lastExport?.billNumber}
+        billNumber={isStale ? undefined : savedBill?.billNumber}
         printedAt={printedAt ?? data.openedAt}
         isReprint={printCount > 1}
       />
@@ -199,9 +278,18 @@ export function ConsolidationClient({ sessionId }: { sessionId: string }) {
           <Button variant="secondary" onClick={handlePrint}>
             🖨 Print
           </Button>
-          {!isClosed ? (
-            <Button isLoading={isExporting} onClick={() => void handleExport()}>
-              Generate bill
+          {/*
+           * Optional now, not a prerequisite: taking payment saves the bill by
+           * itself. This is for the counter who wants the number in hand — to
+           * print it and hand it over — before the guest has actually paid.
+           */}
+          {!isClosed && (!savedBill || isStale) ? (
+            <Button
+              variant={isStale ? 'primary' : 'secondary'}
+              isLoading={isExporting}
+              onClick={() => void handleExport()}
+            >
+              {isStale ? 'Update bill' : 'Generate bill'}
             </Button>
           ) : null}
         </div>
@@ -273,13 +361,8 @@ export function ConsolidationClient({ sessionId }: { sessionId: string }) {
         <aside className="flex flex-col gap-4">
           <BillSummary bill={data} />
 
-          {lastExport ? (
-            <ExportPanel
-              record={lastExport}
-              posReference={posReference}
-              onPosReferenceChange={setPosReference}
-              onConfirm={() => void handleConfirmPos()}
-            />
+          {savedBill ? (
+            <ExportPanel record={savedBill} isStale={isStale} onPrint={handlePrint} />
           ) : null}
 
           {!isClosed ? (
@@ -336,6 +419,7 @@ export function ConsolidationClient({ sessionId }: { sessionId: string }) {
           onChange={(event) => setFreeReason(event.target.value)}
           placeholder="e.g. order placed from a copied link, nobody at the table"
           required
+          maxLength={260}
         />
       </Modal>
 
@@ -343,7 +427,7 @@ export function ConsolidationClient({ sessionId }: { sessionId: string }) {
         open={closeOpen}
         onClose={() => setCloseOpen(false)}
         title={`Close table ${data.tableCode}?`}
-        description="This frees the table on the floor screen. Nothing is deleted — the whole session stays queryable."
+        description="The bill is saved to Billed with its own number, marked paid, and the table goes free. Nothing is deleted — the whole session stays queryable."
         footer={
           <>
             <Button variant="secondary" onClick={() => setCloseOpen(false)}>
@@ -363,35 +447,44 @@ export function ConsolidationClient({ sessionId }: { sessionId: string }) {
           value={closeNote}
           onChange={(event) => setCloseNote(event.target.value)}
           placeholder="e.g. paid by card"
+          maxLength={300}
         />
       </Modal>
     </div>
   );
 }
 
-interface ExportPanelProps {
-  record: BillingExport;
-  posReference: string;
-  onPosReferenceChange: (value: string) => void;
-  onConfirm: () => void;
-}
-
 /**
- * The verify step (§4.4 step 3).
+ * The saved bill.
  *
- * A failed hand-off never blocks printing or taking payment — it just needs to
- * be visible and retryable, because blocking a paying guest on POS uptime is
- * never the right trade.
+ * All this needs to say is "a permanent copy exists, here is its number, and
+ * here is whether it has been paid". There is no POS invoice number to collect
+ * and nothing to confirm by hand — the portal issues the only bill there is, so
+ * asking the counter to reconcile it against a second system would be asking
+ * about a system that does not exist.
  */
-function ExportPanel({ record, posReference, onPosReferenceChange, onConfirm }: ExportPanelProps) {
+function ExportPanel({
+  record,
+  isStale,
+  onPrint,
+}: {
+  record: BillingExport;
+  /** The table has ordered since this bill was saved. */
+  isStale: boolean;
+  onPrint: () => void;
+}) {
+  const paid = record.exportStatus === EXPORT_STATUS.CONFIRMED;
   const failed = record.exportStatus === EXPORT_STATUS.FAILED;
-  const confirmed = record.exportStatus === EXPORT_STATUS.CONFIRMED;
 
   return (
     <div
       className={cn(
         'rounded-card print-hidden flex flex-col gap-3 border-2 p-4',
-        failed ? 'border-status-cancelled bg-status-cancelled-soft' : 'border-line bg-surface',
+        failed
+          ? 'border-status-cancelled bg-status-cancelled-soft'
+          : isStale
+            ? 'border-status-pending bg-status-pending-soft'
+            : 'border-line bg-surface',
       )}
     >
       <div className="flex items-center justify-between gap-2">
@@ -399,43 +492,34 @@ function ExportPanel({ record, posReference, onPosReferenceChange, onConfirm }: 
         <span
           className={cn(
             'rounded-full px-2 py-0.5 text-xs font-bold uppercase',
-            confirmed
+            paid
               ? 'bg-status-ready-soft text-status-ready-ink'
               : failed
                 ? 'bg-status-cancelled text-white'
                 : 'bg-status-pending-soft text-status-pending-ink',
           )}
         >
-          {record.exportStatus}
+          {paid ? '✓ Paid' : failed ? '✕ Failed' : isStale ? '⚠ Out of date' : 'Saved'}
         </span>
       </div>
 
-      {failed ? (
-        <p className="text-status-cancelled-ink text-sm">
-          The POS did not accept the hand-off{record.error ? `: ${record.error}` : ''}. Enter the
-          codes above into the POS by hand, then record its invoice number here.
-        </p>
+      {failed && record.lastError ? (
+        <p className="text-status-cancelled-ink text-sm">{record.lastError}</p>
       ) : null}
 
-      {!confirmed ? (
-        <>
-          <TextField
-            label="POS invoice number"
-            value={posReference}
-            onChange={(event) => onPosReferenceChange(event.target.value)}
-            placeholder="e.g. INV-10482"
-            hint="Ties our bill to the legacy system's own record."
-          />
-          <Button variant="secondary" onClick={onConfirm}>
-            Mark as entered in POS
-          </Button>
-        </>
-      ) : (
-        <p className="text-ink-muted text-sm">
-          Recorded against POS invoice{' '}
-          <span className="text-ink font-semibold">{record.posReferenceId ?? '—'}</span>
-        </p>
-      )}
+      <p className={cn('text-sm', isStale ? 'text-status-pending-ink' : 'text-ink-muted')}>
+        {paid
+          ? `Paid and closed ${formatDateTime(record.confirmedAt ?? record.generatedAt)}.`
+          : isStale
+            ? `This table has ordered since bill ${record.billNumber} was saved — it is for ${formatCurrency(record.total)}, the table now owes more. Taking payment issues a fresh bill for the correct amount; press “Update bill” if you want the new number first.`
+            : 'Saved to Billed. Taking payment will mark it paid and free the table.'}
+      </p>
+
+      {!isStale ? (
+        <Button variant="secondary" fullWidth onClick={onPrint}>
+          🖨 Print this bill
+        </Button>
+      ) : null}
     </div>
   );
 }

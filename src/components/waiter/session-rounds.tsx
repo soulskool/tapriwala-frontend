@@ -3,7 +3,7 @@
 import { StatusPill } from '@/components/ui/status-pill';
 import { ITEM_STATUS, type ItemStatus } from '@/lib/constants';
 import type { OrderItem, OrderRound } from '@/lib/types';
-import { cn, formatClock, formatCurrency, formatElapsed } from '@/lib/utils';
+import { cn, formatClockWithDay, formatCurrency, formatElapsed } from '@/lib/utils';
 
 interface SessionRoundsProps {
   rounds: OrderRound[];
@@ -44,7 +44,7 @@ export function SessionRounds({
 
             <div className="text-ink-muted flex items-center gap-2 text-sm">
               <span>
-                {formatClock(round.placedAt)} · {formatElapsed(round.elapsedMinutes)}
+                {formatClockWithDay(round.placedAt)} · {formatElapsed(round.elapsedMinutes)}
               </span>
               <StatusPill status={round.status} />
             </div>

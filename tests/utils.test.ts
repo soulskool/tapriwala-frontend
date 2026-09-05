@@ -3,6 +3,7 @@ import { describe, expect, it } from 'vitest';
 import {
   formatCurrency,
   formatCurrencyShort,
+  formatClockWithDay,
   formatElapsed,
   minutesSince,
   newIdempotencyKey,
@@ -45,15 +46,21 @@ describe('formatElapsed', () => {
     expect(formatElapsed(59)).toBe('59 min');
   });
 
+  it('keeps the hour form right up to the day boundary', () => {
+    expect(formatElapsed(23 * 60 + 59)).toBe('23h 59m');
+    expect(formatElapsed(24 * 60)).toBe('1d 00h');
+  });
+
   it('zero-pads the minutes past an hour so the column does not jitter', () => {
     expect(formatElapsed(69)).toBe('1h 09m');
   });
 
-  it('does NOT wrap at 24 hours', () => {
-    // A table left open overnight has to read as a day old, not as an hour
-    // old. Anything that folds this modulo 24 makes yesterday look like now.
-    expect(formatElapsed(60 * 25 + 9)).toBe('25h 09m');
-    expect(formatElapsed(3110)).toBe('51h 50m');
+  it('reads an overnight table as days, never as an hour', () => {
+    // A table left open overnight has to read as a day old. Folding this
+    // modulo 24 would make yesterday look like now, and leaving it as raw
+    // hours ("25h 09m", "51h 50m") made nobody read it as yesterday either.
+    expect(formatElapsed(60 * 25 + 9)).toBe('1d 01h');
+    expect(formatElapsed(3110)).toBe('2d 03h');
   });
 });
 
@@ -99,5 +106,31 @@ describe('newIdempotencyKey', () => {
   it('never repeats — two tables replaying must not collide', () => {
     const keys = new Set(Array.from({ length: 500 }, () => newIdempotencyKey()));
     expect(keys.size).toBe(500);
+  });
+});
+
+describe('formatClockWithDay', () => {
+  const at = (iso: string) => new Date(iso);
+
+  it('shows only the clock for something from today', () => {
+    const now = at('2026-09-05T18:00:00');
+    expect(formatClockWithDay('2026-09-05T15:27:00', now)).not.toMatch(/Sep/);
+  });
+
+  it('adds the date once the day has rolled over', () => {
+    // The bug this exists for: a table opened yesterday afternoon read
+    // "3:27 pm", indistinguishable from one opened an hour ago.
+    const now = at('2026-09-05T18:00:00');
+    expect(formatClockWithDay('2026-09-04T15:27:00', now)).toContain('· 4 Sep');
+  });
+
+  it('is not fooled by a same-numbered day in another month', () => {
+    const now = at('2026-09-05T18:00:00');
+    expect(formatClockWithDay('2026-08-05T15:27:00', now)).toContain('· 5 Aug');
+  });
+
+  it('returns a dash for a missing or unparseable timestamp', () => {
+    expect(formatClockWithDay(null)).toBe('—');
+    expect(formatClockWithDay('not a date')).toBe('—');
   });
 });

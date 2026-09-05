@@ -235,6 +235,9 @@ export interface KdsTicketItem {
   status: ItemStatus;
   /** The item was 86'd after this ticket was placed — flag it, don't hide it. */
   unavailable: boolean;
+  /** Snapshotted at order time — never re-read from the menu. */
+  unitPrice: number;
+  lineTotal: number;
 }
 
 export interface KdsTicket {
@@ -250,6 +253,10 @@ export interface KdsTicket {
   placedAt: string;
   elapsedMinutes: number;
   status: RoundStatus;
+  /** What this round is worth, cancelled items excluded. */
+  subtotal: number;
+  tax: number;
+  total: number;
   items: KdsTicketItem[];
 }
 
@@ -331,21 +338,56 @@ export interface ConsolidatedBill {
   requiresReview: boolean;
 }
 
+/**
+ * One frozen line on a saved bill.
+ *
+ * Narrower than `ConsolidatedLine` on purpose, and it must stay that way: the
+ * stored document keeps only what a receipt and an audit need
+ * (`IBillingExportLine`). It has no `displayName`, no `kitchenStation` and no
+ * `rounds` — typing it as a `ConsolidatedLine`, as this used to, promised three
+ * fields that arrive `undefined`.
+ */
+export interface BillingExportLine {
+  productCode: string;
+  /** The name the legacy POS knows. What gets printed on the receipt. */
+  posName: string;
+  quantity: number;
+  unitPrice: number;
+  taxPercent: number;
+  amount: number;
+  taxAmount: number;
+}
+
+/**
+ * A generated bill, exactly as the API sends it.
+ *
+ * The API returns the Mongoose document unshaped, so these names and types
+ * must match `backend/src/models/BillingExport.ts` field for field. Three of
+ * them used to be wrong here: `billNumber` is a number, the failure reason is
+ * `lastError` (declaring it as `error` meant the POS failure message could
+ * never render), and `tableCode` was missing entirely.
+ */
 export interface BillingExport {
   _id: string;
   sessionId: string;
-  billNumber: string;
+  tableId: string;
+  tableCode: string;
+  /** An integer from a global counter — never reused, never reset. */
+  billNumber: number;
   generatedAt: string;
-  lineItems: ConsolidatedLine[];
+  generatedBy: { role: string; userId: string | null; name: string };
+  lineItems: BillingExportLine[];
   subtotal: number;
   tax: number;
   total: number;
   exportMethod: ExportMethod;
   exportStatus: ExportStatus;
   posReferenceId: string | null;
-  error: string;
-  note: string;
   attempts: number;
+  lastAttemptAt: string | null;
+  lastError: string | null;
+  confirmedAt: string | null;
+  note: string;
 }
 
 export interface ExportResult {
