@@ -13,8 +13,16 @@ import { StatusPill } from '@/components/ui/status-pill';
 import { ItemPicker } from '@/components/waiter/item-picker';
 import { SessionRounds } from '@/components/waiter/session-rounds';
 import { useCart } from '@/hooks/use-cart';
-import { ITEM_STATUS, ROLES, SERVICE_REQUEST_TYPE, type ItemStatus } from '@/lib/constants';
+import { OrderTypeToggle } from '@/components/ui/order-type-pill';
+import {
+  ITEM_STATUS,
+  ORDER_TYPE_LABEL,
+  ROLES,
+  SERVICE_REQUEST_TYPE,
+  type ItemStatus,
+} from '@/lib/constants';
 import type { MenuItem, OrderItem, OrderRound } from '@/lib/types';
+import { IconBack, IconBill } from '@/components/ui/icons';
 import { formatCurrency, formatElapsed } from '@/lib/utils';
 import { apiErrorMessage } from '@/store/api/base-query';
 import { useStaffMenuQuery } from '@/store/api/menu-api';
@@ -103,12 +111,19 @@ export function TableOrderClient({ tableId }: { tableId: string }) {
       const placed = await placeRound({
         sessionId: targetSessionId,
         items: cart.toOrderItems(),
+        orderType: cart.orderType,
         idempotencyKey: cart.idempotencyKey,
       }).unwrap();
 
+      // Read off the cart *before* markSubmitted resets it to dining.
+      const sentAs = ORDER_TYPE_LABEL[cart.orderType].toLowerCase();
+
       cart.markSubmitted();
       setCartOpen(false);
-      dispatch(toastPushed(`Sent to the kitchen · KOT ${placed.kotId}`, 'success'));
+      // Names the type back: a parcel sent as a dining round is only caught if
+      // the confirmation says which one went, and it is fixable in the seconds
+      // after sending rather than at the pass.
+      dispatch(toastPushed(`Sent to the kitchen as ${sentAs} · KOT ${placed.kotId}`, 'success'));
     } catch (error) {
       // Loud and sticky: a waiter must never walk away believing an order went
       // through when it did not.
@@ -220,7 +235,7 @@ export function TableOrderClient({ tableId }: { tableId: string }) {
       <header className="flex flex-wrap items-start justify-between gap-3">
         <div>
           <Link href="/waiter" className="text-ink-muted text-sm hover:underline">
-            ← Floor
+            <IconBack aria-hidden className="mr-1 inline size-4" /> Floor
           </Link>
           <h1 className="text-3xl font-bold tracking-tight">{tile.code}</h1>
           <p className="text-ink-muted text-sm">
@@ -236,11 +251,13 @@ export function TableOrderClient({ tableId }: { tableId: string }) {
               rather than settle it themselves. */}
           {sessionId ? (
             <Button variant="secondary" onClick={() => void handleRequestBill()}>
-              🧾 Request bill
+              <IconBill aria-hidden className="mr-1.5 inline size-4" /> Request bill
             </Button>
           ) : null}
           {sessionId && canSettleTable ? (
-            <Button onClick={() => router.push(`/billing/${sessionId}`)}>🧾 Bill this table</Button>
+            <Button onClick={() => router.push(`/billing/${sessionId}`)}>
+              <IconBill aria-hidden className="mr-1.5 inline size-4" /> Bill this table
+            </Button>
           ) : null}
           {sessionId && canFreeTable ? (
             <Button variant="danger" onClick={() => setFreeOpen(true)}>
@@ -313,6 +330,16 @@ export function TableOrderClient({ tableId }: { tableId: string }) {
                 {formatCurrency(cart.totals.estimatedSubtotal)}
               </p>
             </div>
+            {/* Also on the bar, not only inside the drawer: a waiter told
+                "make that a parcel" while still adding items should not have
+                to open the cart to act on it. Both controls drive the same
+                one piece of state. */}
+            <OrderTypeToggle
+              value={cart.orderType}
+              onChange={cart.setOrderType}
+              label="Order type for this round"
+              className="hidden sm:flex"
+            />
             <Button variant="secondary" onClick={cart.clear}>
               Clear
             </Button>
@@ -334,6 +361,8 @@ export function TableOrderClient({ tableId }: { tableId: string }) {
         onSetInstructions={cart.setInstructions}
         onPlaceOrder={() => void handlePlaceOrder()}
         submitLabel={`Send to kitchen · ${tile.code}`}
+        orderType={cart.orderType}
+        onOrderTypeChange={cart.setOrderType}
       />
 
       <Modal

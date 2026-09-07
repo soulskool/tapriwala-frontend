@@ -1,8 +1,10 @@
 'use client';
 
+import { OrderTypePill } from '@/components/ui/order-type-pill';
 import { StatusPill } from '@/components/ui/status-pill';
 import { ITEM_STATUS, type ItemStatus } from '@/lib/constants';
 import type { OrderItem, OrderRound } from '@/lib/types';
+import { IconDelete } from '@/components/ui/icons';
 import { cn, formatClockWithDay, formatCurrency, formatElapsed } from '@/lib/utils';
 
 interface SessionRoundsProps {
@@ -40,6 +42,10 @@ export function SessionRounds({
                 ) : null}
               </h3>
               <span className="text-ink-muted text-sm">KOT {round.kotId}</span>
+              {/* On every round, dining included. The waiter's list is the one
+                  place all of a table's rounds sit together, so it is where a
+                  parcel sent by mistake is actually spotted. */}
+              <OrderTypePill orderType={round.orderType} size="sm" />
             </div>
 
             <div className="text-ink-muted flex items-center gap-2 text-sm">
@@ -121,9 +127,9 @@ function ItemRow({ item, busy, onServe, onCancel }: ItemRowProps) {
             disabled={busy}
             onClick={onCancel}
             aria-label={`Cancel ${item.displayName}`}
-            className="border-line text-ink-muted hover:border-status-cancelled hover:text-status-cancelled-ink min-h-9 rounded-lg border px-2.5 text-sm disabled:opacity-50"
+            className="border-line text-ink-muted hover:border-status-cancelled hover:text-status-cancelled-ink flex min-h-9 items-center justify-center rounded-lg border px-2.5 disabled:opacity-50"
           >
-            ✕
+            <IconDelete aria-hidden className="size-4" />
           </button>
         ) : null}
       </div>

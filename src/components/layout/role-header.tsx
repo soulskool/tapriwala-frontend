@@ -2,6 +2,22 @@
 
 import Link from 'next/link';
 import { usePathname } from 'next/navigation';
+
+import {
+  IconAudit,
+  IconBill,
+  IconBilled,
+  IconClose,
+  IconFloor,
+  IconKitchen,
+  IconMenuToggle,
+  IconOverview,
+  IconProducts,
+  IconStaff,
+  IconTables,
+  type IconType,
+} from '@/components/ui/icons';
+
 import { useState } from 'react';
 
 import { Button } from '@/components/ui/button';
@@ -15,7 +31,7 @@ import { useAppSelector } from '@/store/hooks';
 interface NavItem {
   href: string;
   label: string;
-  icon: string;
+  icon: IconType;
 }
 
 /**
@@ -27,27 +43,27 @@ interface NavItem {
  */
 const NAV_BY_ROLE: Record<string, NavItem[]> = {
   [ROLES.WAITER]: [
-    { href: '/waiter', label: 'Floor', icon: '🍽' },
+    { href: '/waiter', label: 'Floor', icon: IconFloor },
     // Read-only bill history, so a waiter can settle a "what did we pay?"
     // question at the table rather than at the counter.
-    { href: '/waiter/bills', label: 'Billed', icon: '🧾' },
+    { href: '/waiter/bills', label: 'Billed', icon: IconBilled },
   ],
-  [ROLES.KITCHEN]: [{ href: '/kitchen', label: 'Kitchen', icon: '👨‍🍳' }],
+  [ROLES.KITCHEN]: [{ href: '/kitchen', label: 'Kitchen', icon: IconKitchen }],
   [ROLES.BILLING]: [
-    { href: '/billing', label: 'Billing', icon: '🧾' },
-    { href: '/waiter', label: 'Floor', icon: '🍽' },
-    { href: '/waiter/bills', label: 'Billed', icon: '📒' },
+    { href: '/billing', label: 'Billing', icon: IconBill },
+    { href: '/waiter', label: 'Floor', icon: IconFloor },
+    { href: '/waiter/bills', label: 'Billed', icon: IconBilled },
   ],
   [ROLES.ADMIN]: [
-    { href: '/admin', label: 'Overview', icon: '📊' },
-    { href: '/waiter', label: 'Floor', icon: '🍽' },
-    { href: '/kitchen', label: 'Kitchen', icon: '👨‍🍳' },
-    { href: '/billing', label: 'Billing', icon: '🧾' },
-    { href: '/waiter/bills', label: 'Billed', icon: '📒' },
-    { href: '/admin/products', label: 'Menu', icon: '📋' },
-    { href: '/admin/tables', label: 'Tables', icon: '🪑' },
-    { href: '/admin/users', label: 'Staff', icon: '👥' },
-    { href: '/admin/audit', label: 'Audit', icon: '🔍' },
+    { href: '/admin', label: 'Overview', icon: IconOverview },
+    { href: '/waiter', label: 'Floor', icon: IconFloor },
+    { href: '/kitchen', label: 'Kitchen', icon: IconKitchen },
+    { href: '/billing', label: 'Billing', icon: IconBill },
+    { href: '/waiter/bills', label: 'Billed', icon: IconBilled },
+    { href: '/admin/products', label: 'Menu', icon: IconProducts },
+    { href: '/admin/tables', label: 'Tables', icon: IconTables },
+    { href: '/admin/users', label: 'Staff', icon: IconStaff },
+    { href: '/admin/audit', label: 'Audit', icon: IconAudit },
   ],
 };
 
@@ -102,7 +118,11 @@ export function RoleHeader({ title, confirmSignOut = false }: RoleHeaderProps) {
             aria-label={menuOpen ? 'Close menu' : 'Open menu'}
             className="border-line hover:bg-surface-sunken min-h-touch min-w-touch flex items-center justify-center rounded-lg border text-lg lg:hidden"
           >
-            <span aria-hidden>{menuOpen ? '✕' : '☰'}</span>
+            {menuOpen ? (
+              <IconClose aria-hidden className="size-5" />
+            ) : (
+              <IconMenuToggle aria-hidden className="size-5" />
+            )}
           </button>
         ) : null}
 
@@ -125,7 +145,7 @@ export function RoleHeader({ title, confirmSignOut = false }: RoleHeaderProps) {
                   : 'text-ink-muted hover:bg-surface-sunken hover:text-ink',
               )}
             >
-              <span aria-hidden>{item.icon}</span>
+              <item.icon aria-hidden className="size-4 shrink-0" />
               {item.label}
             </Link>
           ))}
@@ -180,9 +200,7 @@ export function RoleHeader({ title, confirmSignOut = false }: RoleHeaderProps) {
                       : 'text-ink hover:bg-surface-sunken',
                   )}
                 >
-                  <span aria-hidden className="text-lg">
-                    {item.icon}
-                  </span>
+                  <item.icon aria-hidden className="size-5 shrink-0" />
                   {item.label}
                 </Link>
               </li>

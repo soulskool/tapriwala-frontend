@@ -3,6 +3,7 @@
 import { memo } from 'react';
 
 import { CART_LIMITS } from '@/lib/constants';
+import { IconDelete, IconMinus } from '@/components/ui/icons';
 import { cn } from '@/lib/utils';
 
 interface QtyStepperProps {
@@ -56,7 +57,11 @@ function QtyStepperComponent({
           'disabled:cursor-not-allowed disabled:opacity-40',
         )}
       >
-        {removes ? '🗑' : '−'}
+        {removes ? (
+          <IconDelete aria-hidden className="size-4" />
+        ) : (
+          <IconMinus aria-hidden className="size-4" />
+        )}
       </button>
 
       <span

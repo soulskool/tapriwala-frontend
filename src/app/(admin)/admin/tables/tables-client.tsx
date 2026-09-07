@@ -1,5 +1,6 @@
 'use client';
 
+import { IconPrint } from '@/components/ui/icons';
 import { useState } from 'react';
 
 import { Button } from '@/components/ui/button';
@@ -87,7 +88,7 @@ export function TablesClient() {
         <span className="text-ink-muted text-sm tabular-nums">{rows.length}</span>
         <div className="flex-1" />
         <Button variant="secondary" onClick={() => setSheetOpen(true)}>
-          🖨 QR sheet
+          <IconPrint aria-hidden className="mr-1.5 inline size-4" /> QR sheet
         </Button>
         <Button onClick={() => setEditing({ ...EMPTY_DRAFT })}>+ Add table</Button>
       </header>

@@ -2,7 +2,9 @@
 
 import { memo, useState } from 'react';
 
+import { IconPrint, IconWarning } from '@/components/ui/icons';
 import { ElapsedTimer } from '@/components/kitchen/elapsed-timer';
+import { OrderTypePill } from '@/components/ui/order-type-pill';
 import { useElapsedMinutes, urgencyFor } from '@/hooks/use-elapsed';
 import { ITEM_STATUS, KITCHEN_SETTABLE_STATUSES, type ItemStatus } from '@/lib/constants';
 import type { KdsTicket, KdsTicketItem } from '@/lib/types';
@@ -12,6 +14,8 @@ interface KotTicketCardProps {
   ticket: KdsTicket;
   onItemStatus: (ticket: KdsTicket, item: KdsTicketItem, status: ItemStatus) => void;
   onAllReady: (ticket: KdsTicket) => void;
+  /** Opens the print preview. The board owns the modal, not the card. */
+  onPrintKot: (ticket: KdsTicket) => void;
   busyItemId?: string | null;
 }
 
@@ -32,6 +36,7 @@ function KotTicketCardComponent({
   ticket,
   onItemStatus,
   onAllReady,
+  onPrintKot,
   busyItemId,
 }: KotTicketCardProps) {
   const minutes = useElapsedMinutes(ticket.placedAt);
@@ -72,6 +77,10 @@ function KotTicketCardComponent({
                 ADD-ON R{ticket.roundNumber}
               </span>
             ) : null}
+            {/* Next to the table code, not buried in the meta line: a cook
+                plating a parcel packs it instead of dressing a plate, and
+                finding that out at the end is finding out too late. */}
+            <OrderTypePill orderType={ticket.orderType} />
           </div>
           <p className="text-ink-muted mt-0.5 text-xs">
             KOT {ticket.kotId} · {formatClockWithDay(ticket.placedAt)} · {ticket.zone}
@@ -116,17 +125,29 @@ function KotTicketCardComponent({
         </p>
       ) : null}
 
-      {!allReady ? (
-        <footer className="border-line border-t p-2">
+      <footer className="border-line flex gap-2 border-t p-2">
+        {/* Available for the whole life of the ticket, including after it is
+            all ready: a lost or smudged docket gets reprinted, and that is
+            most likely to be noticed once the food is under the pass. */}
+        <button
+          type="button"
+          onClick={() => onPrintKot(ticket)}
+          aria-label={`Preview and print KOT ${ticket.kotId}`}
+          className="min-h-touch border-line text-ink hover:bg-surface-muted flex flex-1 items-center justify-center gap-1.5 rounded-lg border-2 text-base font-bold transition"
+        >
+          <IconPrint aria-hidden className="size-4" /> Print KOT
+        </button>
+
+        {!allReady ? (
           <button
             type="button"
             onClick={() => onAllReady(ticket)}
-            className="min-h-touch bg-status-ready w-full rounded-lg text-base font-bold text-white transition hover:brightness-110 active:brightness-95"
+            className="min-h-touch bg-status-ready flex-1 rounded-lg text-base font-bold text-white transition hover:brightness-110 active:brightness-95"
           >
             All ready
           </button>
-        </footer>
-      ) : null}
+        ) : null}
+      </footer>
     </article>
   );
 }
@@ -181,8 +202,9 @@ function TicketItemRow({
           {/* The item was 86'd after this ticket was placed. Flag it — never
               hide it — so the cook can tell the waiter instead of guessing. */}
           {item.unavailable && !cancelled ? (
-            <p className="text-status-cancelled mt-1 text-sm font-bold">
-              ⚠ Marked unavailable — check with the floor
+            <p className="text-status-cancelled mt-1 flex items-center gap-1.5 text-sm font-bold">
+              <IconWarning aria-hidden className="size-4 shrink-0" />
+              Marked unavailable — check with the floor
             </p>
           ) : null}
         </div>

@@ -2,6 +2,7 @@
 
 import { useEffect, useRef, type ReactNode } from 'react';
 
+import { IconClose } from '@/components/ui/icons';
 import { cn } from '@/lib/utils';
 
 interface ModalProps {
@@ -70,7 +71,7 @@ export function Modal({
           aria-label="Close"
           className="text-ink-muted hover:bg-surface-sunken -mr-1 flex size-9 shrink-0 items-center justify-center rounded-lg"
         >
-          ✕
+          <IconClose aria-hidden className="size-4" />
         </button>
       </div>
 

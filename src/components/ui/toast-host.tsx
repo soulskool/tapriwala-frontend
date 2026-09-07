@@ -2,6 +2,7 @@
 
 import { useEffect } from 'react';
 
+import { IconCheck, IconClose, IconInfo, IconWarning } from '@/components/ui/icons';
 import { cn } from '@/lib/utils';
 import { useAppDispatch, useAppSelector } from '@/store/hooks';
 import { toastDismissed, type Toast } from '@/store/slices/ui-slice';
@@ -34,9 +35,10 @@ const TONE_STYLE = {
   info: 'bg-ink text-white',
 } as const;
 
-const TONE_ICON = { success: '✓', error: '⚠️', info: 'ℹ️' } as const;
+const TONE_ICON = { success: IconCheck, error: IconWarning, info: IconInfo } as const;
 
 function ToastCard({ toast }: { toast: Toast }) {
+  const ToneIcon = TONE_ICON[toast.tone];
   const dispatch = useAppDispatch();
 
   useEffect(() => {
@@ -57,11 +59,9 @@ function ToastCard({ toast }: { toast: Toast }) {
         TONE_STYLE[toast.tone],
       )}
     >
-      <span aria-hidden>{TONE_ICON[toast.tone]}</span>
+      <ToneIcon aria-hidden className="mt-0.5 size-4 shrink-0" />
       <span className="flex-1">{toast.message}</span>
-      <span aria-hidden className="opacity-70">
-        ✕
-      </span>
+      <IconClose aria-hidden className="mt-0.5 size-4 shrink-0 opacity-70" />
     </button>
   );
 }

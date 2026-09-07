@@ -1,5 +1,6 @@
 import type { ReactNode } from 'react';
 
+import { IconWarning } from '@/components/ui/icons';
 import { cn } from '@/lib/utils';
 
 /**
@@ -69,9 +70,7 @@ export function ErrorState({ message, onRetry }: ErrorStateProps) {
       role="alert"
       className="rounded-card border-status-cancelled/30 bg-status-cancelled-soft flex flex-col items-center gap-3 border px-6 py-10 text-center"
     >
-      <span aria-hidden className="text-3xl">
-        ⚠️
-      </span>
+      <IconWarning aria-hidden className="text-status-cancelled size-8" />
       <p className="text-status-cancelled-ink text-sm font-medium">{message}</p>
       {onRetry ? (
         <button

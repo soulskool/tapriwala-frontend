@@ -5,7 +5,8 @@ import Link from 'next/link';
 import { EmptyState } from '@/components/ui/feedback';
 import { SERVICE_REQUEST_STATUS } from '@/lib/constants';
 import type { ServiceRequest } from '@/lib/types';
-import { SERVICE_REQUEST_ICON, SERVICE_REQUEST_LABEL, cn, formatElapsed } from '@/lib/utils';
+import { IconCheck, SERVICE_REQUEST_ICON } from '@/components/ui/icons';
+import { SERVICE_REQUEST_LABEL, cn, formatElapsed } from '@/lib/utils';
 
 interface ServiceRequestFeedProps {
   requests: ServiceRequest[];
@@ -30,7 +31,7 @@ export function ServiceRequestFeed({
   if (requests.length === 0) {
     return (
       <EmptyState
-        icon="✓"
+        icon={<IconCheck />}
         title="No one is waiting"
         description="Water, call-staff and bill requests appear here the moment a guest taps."
       />
@@ -42,6 +43,7 @@ export function ServiceRequestFeed({
       {requests.map((request) => {
         const id = request.requestId ?? request._id ?? '';
         const acknowledged = request.status === SERVICE_REQUEST_STATUS.ACKNOWLEDGED;
+        const RequestIcon = SERVICE_REQUEST_ICON[request.type];
 
         return (
           <li
@@ -53,9 +55,7 @@ export function ServiceRequestFeed({
                 : 'border-line',
             )}
           >
-            <span aria-hidden className="text-2xl">
-              {SERVICE_REQUEST_ICON[request.type]}
-            </span>
+            <RequestIcon aria-hidden className="mt-0.5 size-6 shrink-0" />
 
             <div className="min-w-0 flex-1">
               <p className="font-semibold">

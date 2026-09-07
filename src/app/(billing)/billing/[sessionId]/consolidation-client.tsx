@@ -4,6 +4,7 @@ import Link from 'next/link';
 import { useRouter } from 'next/navigation';
 import { useState } from 'react';
 
+import { IconBack, IconDownload, IconPrint, IconWarning } from '@/components/ui/icons';
 import { BillSummary } from '@/components/billing/bill-summary';
 import { ConsolidatedLineItem } from '@/components/billing/consolidated-line-item';
 import { ReceiptSheet } from '@/components/billing/receipt-sheet';
@@ -245,6 +246,15 @@ export function ConsolidationClient({ sessionId }: { sessionId: string }) {
   const data = bill.data;
   const isClosed = data.status === SESSION_STATUS.CLOSED;
 
+  /**
+   * The table both ate here and carried something out.
+   *
+   * Drives the per-line badge and the marker on the paper. Computed once from
+   * the server's summary rather than by scanning the lines, so screen and
+   * receipt can never disagree about whether this bill is mixed.
+   */
+  const isMixedOrderType = data.orderTypes.length > 1;
+
   return (
     <div className="flex flex-col gap-5">
       {/* Screen-invisible; `@media print` is the only thing that reveals it. */}
@@ -258,7 +268,7 @@ export function ConsolidationClient({ sessionId }: { sessionId: string }) {
       <header className="print-hidden flex flex-wrap items-start justify-between gap-3">
         <div>
           <Link href="/billing" className="text-ink-muted text-sm hover:underline">
-            ← Counter
+            <IconBack aria-hidden className="mr-1 inline size-4" /> Counter
           </Link>
           <h1 className="text-3xl font-bold tracking-tight">Table {data.tableCode}</h1>
           <p className="text-ink-muted text-sm">
@@ -273,10 +283,10 @@ export function ConsolidationClient({ sessionId }: { sessionId: string }) {
               void downloadBillCsv(sessionId, `bill-${data.tableCode}-${data.sessionNumber}.csv`)
             }
           >
-            ⬇ CSV
+            <IconDownload aria-hidden className="mr-1.5 inline size-4" /> CSV
           </Button>
           <Button variant="secondary" onClick={handlePrint}>
-            🖨 Print
+            <IconPrint aria-hidden className="mr-1.5 inline size-4" /> Print
           </Button>
           {/*
            * Optional now, not a prerequisite: taking payment saves the bill by
@@ -300,8 +310,9 @@ export function ConsolidationClient({ sessionId }: { sessionId: string }) {
           role="alert"
           className="rounded-card border-status-pending/40 bg-status-pending-soft text-status-pending-ink print-hidden border px-4 py-3 text-sm"
         >
-          ⚠ Items were cancelled after the kitchen started them. This session is held for a manager
-          to look at — closing it will be recorded as an override.
+          <IconWarning aria-hidden className="mr-1 inline size-4" /> Items were cancelled after the
+          kitchen started them. This session is held for a manager to look at — closing it will be
+          recorded as an override.
         </p>
       ) : null}
 
@@ -332,7 +343,13 @@ export function ConsolidationClient({ sessionId }: { sessionId: string }) {
             </thead>
             <tbody>
               {data.lines.map((line) => (
-                <ConsolidatedLineItem key={line.productCode} line={line} />
+                // Keyed on code *and* type: a mixed bill has the same code on
+                // two rows, and a bare code would collide.
+                <ConsolidatedLineItem
+                  key={`${line.productCode}-${line.orderType}`}
+                  line={line}
+                  showOrderType={isMixedOrderType}
+                />
               ))}
 
               {data.cancelledLines.length > 0 ? (
@@ -347,9 +364,10 @@ export function ConsolidationClient({ sessionId }: { sessionId: string }) {
                   </tr>
                   {data.cancelledLines.map((line) => (
                     <ConsolidatedLineItem
-                      key={`cancelled-${line.productCode}`}
+                      key={`cancelled-${line.productCode}-${line.orderType}`}
                       line={line}
                       cancelled
+                      showOrderType={isMixedOrderType}
                     />
                   ))}
                 </>
@@ -499,7 +517,7 @@ function ExportPanel({
                 : 'bg-status-pending-soft text-status-pending-ink',
           )}
         >
-          {paid ? '✓ Paid' : failed ? '✕ Failed' : isStale ? '⚠ Out of date' : 'Saved'}
+          {paid ? 'Paid' : failed ? 'Failed' : isStale ? 'Out of date' : 'Saved'}
         </span>
       </div>
 
@@ -517,7 +535,7 @@ function ExportPanel({
 
       {!isStale ? (
         <Button variant="secondary" fullWidth onClick={onPrint}>
-          🖨 Print this bill
+          <IconPrint aria-hidden className="mr-1.5 inline size-4" /> Print this bill
         </Button>
       ) : null}
     </div>

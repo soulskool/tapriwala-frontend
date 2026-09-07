@@ -5,6 +5,7 @@ import { memo } from 'react';
 
 import { QtyStepper } from '@/components/ui/qty-stepper';
 import type { MenuItem } from '@/lib/types';
+import { IconFloor } from '@/components/ui/icons';
 import { cn, formatCurrency } from '@/lib/utils';
 
 interface MenuItemCardProps {
@@ -46,9 +47,9 @@ function MenuItemCardComponent({
       ) : (
         <div
           aria-hidden
-          className="bg-surface-sunken flex size-20 shrink-0 items-center justify-center rounded-xl text-2xl"
+          className="bg-surface-sunken text-ink-muted flex size-20 shrink-0 items-center justify-center rounded-xl"
         >
-          🍽
+          <IconFloor className="size-7 opacity-50" />
         </div>
       )}
 

@@ -4,8 +4,10 @@ import { useState } from 'react';
 
 import { Button } from '@/components/ui/button';
 import { QtyStepper } from '@/components/ui/qty-stepper';
-import { CART_LIMITS } from '@/lib/constants';
+import { CART_LIMITS, type OrderType } from '@/lib/constants';
 import type { CartLine } from '@/lib/types';
+import { OrderTypeToggle } from '@/components/ui/order-type-pill';
+import { IconClose } from '@/components/ui/icons';
 import { cn, formatCurrency } from '@/lib/utils';
 
 interface CartDrawerProps {
@@ -21,6 +23,15 @@ interface CartDrawerProps {
   submitLabel?: string;
   /** Shown above the button — e.g. the table is mid-bill and should not order. */
   blockedReason?: string | null;
+  /**
+   * Dining / parcel chooser. Both props or neither.
+   *
+   * Absent on the customer's own phone, and that is not an oversight: the
+   * public endpoint ignores the field, so a toggle there would be a control
+   * that appears to work and changes nothing.
+   */
+  orderType?: OrderType;
+  onOrderTypeChange?: (orderType: OrderType) => void;
 }
 
 /**
@@ -41,6 +52,8 @@ export function CartDrawer({
   onPlaceOrder,
   submitLabel = 'Place order',
   blockedReason = null,
+  orderType,
+  onOrderTypeChange,
 }: CartDrawerProps) {
   if (!open) return null;
 
@@ -70,7 +83,7 @@ export function CartDrawer({
             aria-label="Close"
             className="text-ink-muted hover:bg-surface-sunken flex size-9 items-center justify-center rounded-lg"
           >
-            ✕
+            <IconClose aria-hidden className="size-4" />
           </button>
         </header>
 
@@ -93,6 +106,21 @@ export function CartDrawer({
         </ul>
 
         <footer className="border-line bg-surface-muted border-t px-5 pt-4 pb-[max(1rem,env(safe-area-inset-bottom))]">
+          {/* Above the total, not below it: the last thing decided before the
+              order is sent should be the last thing the eye passes over. */}
+          {orderType && onOrderTypeChange ? (
+            <div className="mb-3">
+              <p className="text-ink-muted mb-1.5 text-sm font-medium">
+                Is this for the table or to take away?
+              </p>
+              <OrderTypeToggle
+                value={orderType}
+                onChange={onOrderTypeChange}
+                label="Order type for this round"
+              />
+            </div>
+          ) : null}
+
           <div className="mb-3 flex items-baseline justify-between">
             <span className="text-ink-muted text-sm">Estimated subtotal</span>
             <span className="text-xl font-bold tabular-nums">

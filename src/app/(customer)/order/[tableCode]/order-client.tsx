@@ -10,6 +10,7 @@ import {
 import { CartDrawer } from '@/components/menu/cart-drawer';
 import { MenuCategoryTabs } from '@/components/menu/menu-category-tabs';
 import { MenuItemCard } from '@/components/menu/menu-item-card';
+import { IconBill, IconSearch } from '@/components/ui/icons';
 import { Button } from '@/components/ui/button';
 import { ConnectionDot } from '@/components/ui/connection-dot';
 import { EmptyState } from '@/components/ui/feedback';
@@ -221,7 +222,8 @@ export function OrderClient({ tableCode, initialTable, initialMenu }: OrderClien
 
       {billRequested ? (
         <p className="rounded-card border-status-bill/30 bg-status-bill-soft text-status-bill-ink border px-4 py-3 text-sm">
-          🧾 Your bill has been requested. A staff member is on their way.
+          <IconBill aria-hidden className="mr-1.5 inline size-4" /> Your bill has been requested. A
+          staff member is on their way.
         </p>
       ) : null}
 
@@ -267,7 +269,7 @@ export function OrderClient({ tableCode, initialTable, initialMenu }: OrderClien
         {isSearching ? (
           searchResults.length === 0 ? (
             <EmptyState
-              icon="🔍"
+              icon={<IconSearch />}
               title="Nothing matches that"
               description="Try a different word, or ask a staff member."
             />

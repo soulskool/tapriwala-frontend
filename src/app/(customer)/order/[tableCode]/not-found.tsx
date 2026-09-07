@@ -1,3 +1,5 @@
+import { IconCamera } from '@/components/ui/icons';
+
 /**
  * A sticker that no longer resolves.
  *
@@ -8,9 +10,7 @@
 export default function InvalidQrPage() {
   return (
     <main className="flex min-h-dvh flex-col items-center justify-center gap-4 px-6 text-center">
-      <span aria-hidden className="text-5xl">
-        📷
-      </span>
+      <IconCamera aria-hidden className="text-ink-muted size-12" />
       <h1 className="text-2xl font-bold">This QR code isn&apos;t working</h1>
       <p className="text-ink-muted max-w-sm">
         The sticker may have been replaced, or this table is not in service right now. Please ask a

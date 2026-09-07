@@ -3,6 +3,7 @@
 import Link from 'next/link';
 import { memo } from 'react';
 
+import { IconRequest } from '@/components/ui/icons';
 import { TILE_STATUS_STYLE } from '@/components/ui/status-pill';
 import { TILE_EMPTY } from '@/lib/constants';
 import type { LiveTableTile } from '@/lib/types';
@@ -21,6 +22,7 @@ import { cn, formatCurrencyShort, formatElapsed } from '@/lib/utils';
  */
 function TableGridCellComponent({ tile }: { tile: LiveTableTile }) {
   const style = TILE_STATUS_STYLE[tile.status] ?? TILE_STATUS_STYLE[TILE_EMPTY];
+  const StatusIcon = style.icon;
   const isEmpty = tile.status === TILE_EMPTY;
 
   return (
@@ -36,9 +38,7 @@ function TableGridCellComponent({ tile }: { tile: LiveTableTile }) {
     >
       <div className="flex items-start justify-between gap-1">
         <span className="text-xl leading-none font-bold">{tile.code}</span>
-        <span aria-hidden className="text-base leading-none">
-          {style.icon}
-        </span>
+        <StatusIcon aria-hidden className="size-4 shrink-0" />
       </div>
 
       <div className="flex flex-col gap-0.5">
@@ -67,9 +67,9 @@ function TableGridCellComponent({ tile }: { tile: LiveTableTile }) {
           {tile.openServiceRequests > 0 ? (
             <span
               title={`${tile.openServiceRequests} open request(s)`}
-              className="bg-status-cancelled flex size-6 items-center justify-center rounded-full text-xs font-bold text-white shadow"
+              className="bg-status-cancelled flex size-6 items-center justify-center rounded-full text-white shadow"
             >
-              🔔
+              <IconRequest aria-hidden className="size-3.5" />
             </span>
           ) : null}
         </div>

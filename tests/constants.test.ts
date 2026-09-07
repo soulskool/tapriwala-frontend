@@ -14,12 +14,9 @@ import {
   TABLE_ZONES,
   ZONE_DISPLAY_ORDER,
 } from '@/lib/constants';
-import {
-  ITEM_STATUS_LABEL,
-  SERVICE_REQUEST_ICON,
-  SERVICE_REQUEST_LABEL,
-  TILE_STATUS_LABEL,
-} from '@/lib/utils';
+import { ITEM_STATUS_LABEL, SERVICE_REQUEST_LABEL, TILE_STATUS_LABEL } from '@/lib/utils';
+// Icons are React components now, so they live with the components.
+import { SERVICE_REQUEST_ICON } from '@/components/ui/icons';
 
 /**
  * Internal consistency of the domain constants.

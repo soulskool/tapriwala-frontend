@@ -2,6 +2,7 @@
 
 import { useState } from 'react';
 
+import { IconBill, IconCheck, IconCollapse, IconExpand, IconWarning } from '@/components/ui/icons';
 import type { LiveTableTile } from '@/lib/types';
 import { cn, formatCurrencyShort, formatElapsed, sumBy } from '@/lib/utils';
 
@@ -45,9 +46,7 @@ export function BillingNowPanel({ tables }: { tables: LiveTableTile[] }) {
             : 'border-line bg-surface text-ink-muted',
         )}
       >
-        <span aria-hidden className="text-base leading-none">
-          🧾
-        </span>
+        <IconBill aria-hidden className="size-4 shrink-0" />
         <span>Billing now</span>
         <span className="tabular-nums">{billing.length}</span>
 
@@ -58,9 +57,11 @@ export function BillingNowPanel({ tables }: { tables: LiveTableTile[] }) {
           </span>
         ) : null}
 
-        <span aria-hidden className="ml-auto pl-2 text-xs">
-          {open ? '▲' : '▼'}
-        </span>
+        {open ? (
+          <IconCollapse aria-hidden className="ml-auto size-4 shrink-0" />
+        ) : (
+          <IconExpand aria-hidden className="ml-auto size-4 shrink-0" />
+        )}
       </button>
 
       {open ? (
@@ -107,10 +108,18 @@ function BillingTableCard({ tile }: { tile: LiveTableTile }) {
         </span>
       </div>
 
-      <p className="text-sm leading-snug font-semibold">
-        {owed > 0
-          ? `⚠ ${owed} item${owed === 1 ? '' : 's'} still to cook`
-          : '✓ Nothing left to cook'}
+      <p className="flex items-center gap-1.5 text-sm leading-snug font-semibold">
+        {owed > 0 ? (
+          <>
+            <IconWarning aria-hidden className="size-4 shrink-0" />
+            {owed} item{owed === 1 ? '' : 's'} still to cook
+          </>
+        ) : (
+          <>
+            <IconCheck aria-hidden className="size-4 shrink-0" />
+            Nothing left to cook
+          </>
+        )}
       </p>
 
       <p className="text-xs tabular-nums opacity-80">

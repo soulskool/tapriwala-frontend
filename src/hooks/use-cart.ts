@@ -2,6 +2,7 @@
 
 import { useCallback, useMemo } from 'react';
 
+import { ORDER_TYPE, type OrderType } from '@/lib/constants';
 import type { CartLine, MenuItem, OrderItemInput } from '@/lib/types';
 import { sumBy } from '@/lib/utils';
 import { useAppDispatch, useAppSelector } from '@/store/hooks';
@@ -10,6 +11,7 @@ import {
   cartSubmitted,
   clearCart,
   removeLine,
+  setCartOrderType,
   setLineInstructions,
   setLineQuantity,
 } from '@/store/slices/cart-slice';
@@ -65,6 +67,18 @@ export function useCart(scope: string) {
     [dispatch, scope],
   );
 
+  /**
+   * Dining or parcel for the round about to be sent.
+   *
+   * Only staff screens call this. The customer order page never does, because
+   * the public endpoint ignores the field — a toggle there would be a control
+   * that silently does nothing.
+   */
+  const setOrderType = useCallback(
+    (orderType: OrderType) => dispatch(setCartOrderType({ scope, orderType })),
+    [dispatch, scope],
+  );
+
   /** Call only after the server acknowledges the round. */
   const markSubmitted = useCallback(() => dispatch(cartSubmitted({ scope })), [dispatch, scope]);
 
@@ -103,6 +117,10 @@ export function useCart(scope: string) {
   return {
     lines,
     totals,
+    // Falls back rather than trusting the stored cart: one persisted before
+    // this field existed has no type on it.
+    orderType: cart?.orderType ?? ORDER_TYPE.DINING,
+    setOrderType,
     idempotencyKey: cart?.idempotencyKey ?? '',
     isEmpty: lines.length === 0,
     add,

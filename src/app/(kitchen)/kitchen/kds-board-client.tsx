@@ -3,7 +3,10 @@
 import { useMemo, useState } from 'react';
 
 import { BillingNowPanel } from '@/components/kitchen/billing-now-panel';
+import { KotPrintModal } from '@/components/kitchen/kot-print-modal';
 import { KotTicketCard } from '@/components/kitchen/kot-ticket-card';
+import type { KotData } from '@/components/kitchen/kot-sheet';
+import { IconCheck, IconSoundOff, IconSoundOn } from '@/components/ui/icons';
 import { ErrorState, LoadingBlock } from '@/components/ui/feedback';
 import { useNewTicketChime } from '@/hooks/use-new-ticket-chime';
 import {
@@ -51,6 +54,15 @@ export function KdsBoardClient() {
   const [updateItemStatus] = useUpdateItemStatusMutation();
   const [updateRoundStatus] = useUpdateRoundStatusMutation();
   const [busyItemId, setBusyItemId] = useState<string | null>(null);
+  /**
+   * The ticket whose paper is being previewed.
+   *
+   * Held here rather than on each card so exactly one preview can be open at
+   * a time — and so the KOT is snapshotted at the moment the button was
+   * pressed. A socket tick landing mid-preview must not change the sheet under
+   * the hand about to print it.
+   */
+  const [printTarget, setPrintTarget] = useState<KotData | null>(null);
 
   const tickets = useMemo(() => queue.data?.tickets ?? [], [queue.data]);
 
@@ -96,6 +108,33 @@ export function KdsBoardClient() {
     }
   }
 
+  /**
+   * Maps a live ticket to the paper's shape.
+   *
+   * Built from the *unfiltered* round, not the station-filtered view: a cook
+   * on the Beverage tab printing a mixed ticket must still hand the kitchen a
+   * docket with the food on it, or half the order silently never gets cooked.
+   */
+  function handlePrintKot(ticket: KdsTicket) {
+    const full = tickets.find((entry) => entry.roundId === ticket.roundId) ?? ticket;
+
+    setPrintTarget({
+      kotId: full.kotId,
+      tableCode: full.tableCode,
+      orderType: full.orderType,
+      roundNumber: full.roundNumber,
+      isAddOn: full.isAddOn,
+      placedAt: full.placedAt,
+      placedByName: full.placedByName,
+      items: full.items.map((item) => ({
+        displayName: item.displayName,
+        quantity: item.quantity,
+        specialInstructions: item.specialInstructions,
+        status: item.status,
+      })),
+    });
+  }
+
   return (
     <div className="flex flex-col">
       <div className="mb-3 flex flex-wrap items-center gap-1.5">
@@ -122,7 +161,11 @@ export function KdsBoardClient() {
           title={soundEnabled ? 'Sound on' : 'Sound off'}
           className="border-line bg-surface ml-auto flex size-10 items-center justify-center rounded-lg border text-lg"
         >
-          {soundEnabled ? '🔔' : '🔕'}
+          {soundEnabled ? (
+            <IconSoundOn aria-hidden className="size-5" />
+          ) : (
+            <IconSoundOff aria-hidden className="size-5" />
+          )}
         </button>
       </div>
 
@@ -138,9 +181,7 @@ export function KdsBoardClient() {
           />
         ) : visible.length === 0 ? (
           <div className="flex flex-col items-center justify-center gap-3 py-24 text-center">
-            <span aria-hidden className="text-6xl">
-              ✓
-            </span>
+            <IconCheck aria-hidden className="text-status-ready size-14" />
             <p className="text-2xl font-bold">All caught up</p>
             <p className="text-ink-muted">New tickets appear here the moment they are placed.</p>
           </div>
@@ -153,11 +194,18 @@ export function KdsBoardClient() {
                 busyItemId={busyItemId}
                 onItemStatus={(target, item, status) => void handleItemStatus(target, item, status)}
                 onAllReady={(target) => void handleAllReady(target)}
+                onPrintKot={handlePrintKot}
               />
             ))}
           </div>
         )}
       </div>
+
+      <KotPrintModal
+        kot={printTarget}
+        open={printTarget !== null}
+        onClose={() => setPrintTarget(null)}
+      />
     </div>
   );
 }

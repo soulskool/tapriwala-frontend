@@ -1,7 +1,8 @@
 'use client';
 
+import { IconCheck, IconClose, SERVICE_REQUEST_ICON } from '@/components/ui/icons';
 import { SERVICE_REQUEST_TYPE, type ServiceRequestType } from '@/lib/constants';
-import { SERVICE_REQUEST_ICON, cn, formatClock } from '@/lib/utils';
+import { cn, formatClock } from '@/lib/utils';
 
 /**
  * What the guest is promised, per request type.
@@ -64,6 +65,7 @@ export function ServiceRequestBar({
           const disabled = pending !== null || billBlocked;
           const alreadySent = Boolean(sent[action.type]);
 
+          const Icon = SERVICE_REQUEST_ICON[action.type];
           const hint = billBlocked
             ? 'Order something first'
             : alreadySent
@@ -86,9 +88,7 @@ export function ServiceRequestBar({
                     : 'border-brand-200 text-brand-800 hover:border-brand-400 hover:bg-brand-50 active:bg-brand-100',
               )}
             >
-              <span aria-hidden className="text-2xl leading-none">
-                {SERVICE_REQUEST_ICON[action.type]}
-              </span>
+              <Icon aria-hidden className="size-7" />
               <span className="text-sm leading-tight font-semibold">
                 {pending === action.type ? 'Sending…' : action.label}
               </span>
@@ -118,9 +118,7 @@ export function ServiceRequestBar({
                 'animate-rise flex items-start gap-2 border px-3 py-2.5',
               )}
             >
-              <span aria-hidden className="text-base leading-5">
-                ✓
-              </span>
+              <IconCheck aria-hidden className="mt-0.5 size-4 shrink-0" />
               <p className="flex-1 text-sm leading-snug">
                 {SERVICE_REQUEST_CONFIRMATION[action.type]}{' '}
                 <span className="opacity-75">Asked at {formatClock(sent[action.type])}.</span>
@@ -129,9 +127,9 @@ export function ServiceRequestBar({
                 type="button"
                 onClick={() => onDismiss(action.type)}
                 aria-label={`Dismiss the ${action.label.toLowerCase()} confirmation`}
-                className="-my-1 -mr-1 flex size-8 shrink-0 items-center justify-center rounded-lg text-sm opacity-60"
+                className="-my-1 -mr-1 flex size-8 shrink-0 items-center justify-center rounded-lg opacity-60"
               >
-                ✕
+                <IconClose aria-hidden className="size-4" />
               </button>
             </li>
           ))}

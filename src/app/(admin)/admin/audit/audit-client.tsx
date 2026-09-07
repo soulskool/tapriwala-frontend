@@ -1,5 +1,6 @@
 'use client';
 
+import { IconBack, IconSearch } from '@/components/ui/icons';
 import { useState } from 'react';
 
 import { Button } from '@/components/ui/button';
@@ -92,7 +93,7 @@ export function AuditClient() {
           onRetry={() => void audit.refetch()}
         />
       ) : entries.length === 0 ? (
-        <EmptyState icon="🔍" title="Nothing recorded for that filter" />
+        <EmptyState icon={<IconSearch />} title="Nothing recorded for that filter" />
       ) : (
         <>
           <ol className="flex flex-col gap-1.5">
@@ -108,7 +109,7 @@ export function AuditClient() {
                 disabled={!pagination.hasPrevPage}
                 onClick={() => setPage((current) => current - 1)}
               >
-                ← Newer
+                <IconBack aria-hidden className="mr-1 inline size-4" /> Newer
               </Button>
               <span className="text-ink-muted text-sm tabular-nums">
                 {pagination.page} / {pagination.totalPages}

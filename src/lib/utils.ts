@@ -15,6 +15,10 @@ import {
   type TileStatus,
 } from './constants';
 
+// Request *icons* used to live here too. They are React components now, and
+// this file stays free of anything that cannot run in a plain string render —
+// see `components/ui/icons.tsx`.
+
 // ─── Class names ─────────────────────────────────────────────────────────────
 
 /**
@@ -161,13 +165,6 @@ export const SERVICE_REQUEST_LABEL: Record<ServiceRequestType, string> = {
   [SERVICE_REQUEST_TYPE.WATER]: 'Water',
   [SERVICE_REQUEST_TYPE.CALL_STAFF]: 'Call staff',
   [SERVICE_REQUEST_TYPE.BILL]: 'Bill',
-};
-
-/** Icons double as the non-colour channel on request chips. */
-export const SERVICE_REQUEST_ICON: Record<ServiceRequestType, string> = {
-  [SERVICE_REQUEST_TYPE.WATER]: '💧',
-  [SERVICE_REQUEST_TYPE.CALL_STAFF]: '🔔',
-  [SERVICE_REQUEST_TYPE.BILL]: '🧾',
 };
 
 // ─── Misc ────────────────────────────────────────────────────────────────────

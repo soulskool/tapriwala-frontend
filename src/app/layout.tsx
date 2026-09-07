@@ -5,10 +5,10 @@ import './globals.css';
 
 export const metadata: Metadata = {
   title: {
-    default: 'ACD Cafe',
-    template: '%s · ACD Cafe',
+    default: 'Tapriwala by Treatmeets',
+    template: '%s · Tapriwala by Treatmeets',
   },
-  description: 'Real-time ordering, kitchen display and billing for ACD Cafe.',
+  description: 'Real-time ordering, kitchen display and billing for Tapriwala by Treatmeets.',
   // The tab icon is `src/app/icon.png` — a file-convention Next picks up on its
   // own, which is why there is no `icons` key here. It is a 256px render of the
   // café's logo (`public/icon.svg`); the SVG itself is 5 MB because the artwork

@@ -162,6 +162,15 @@ body {
   display: none;
 }
 
+/*
+ * The kitchen ticket. Same 80mm roll, same trick — hidden on screen, revealed
+ * by `@media print` only. The modal's on-screen preview is a separate element
+ * with its own styling; this one is the paper.
+ */
+.kot-sheet {
+  display: none;
+}
+
 @page {
   size: 80mm auto;
   margin: 0;
@@ -185,7 +194,8 @@ body {
     display: none !important;
   }
 
-  .receipt-sheet {
+  .receipt-sheet,
+  .kot-sheet {
     display: block;
     width: 72mm; /* 80mm roll less the printer's unprintable margins */
     margin: 0;
@@ -194,12 +204,37 @@ body {
     font-family: ui-monospace, 'Courier New', monospace;
   }
 
-  .receipt-body {
+  /*
+   * A mounted KOT wins over the receipt.
+   *
+   * The two sheets never coexist today — the KOT modal mounts its sheet for
+   * the length of one `window.print()` call and the counter's receipt lives on
+   * a different route. This is the guard for the day someone puts a Print KOT
+   * button on the billing screen: without it that press would hand the guest
+   * a kitchen ticket stapled to their bill.
+   */
+  body:has(.kot-sheet) .receipt-sheet {
+    display: none !important;
+  }
+
+  .receipt-body,
+  .kot-body {
     margin: 0;
     font-size: 10.5pt;
     line-height: 1.35;
     white-space: pre;
     font-family: inherit;
+  }
+
+  /*
+   * Bigger than the receipt on purpose. This is read at arm's length across a
+   * hot kitchen, wet-handed, usually clipped to a rail — not held six inches
+   * from the face at a counter like the bill is.
+   */
+  .kot-body {
+    font-size: 12pt;
+    line-height: 1.45;
+    font-weight: 700;
   }
 
   /* The one line the guest actually looks for. */

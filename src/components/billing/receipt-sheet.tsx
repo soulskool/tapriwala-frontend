@@ -1,3 +1,4 @@
+import { ORDER_TYPE, ORDER_TYPE_LABEL, type OrderType } from '@/lib/constants';
 import { formatDateTime } from '@/lib/utils';
 
 /**
@@ -7,15 +8,20 @@ import { formatDateTime } from '@/lib/utils';
  * which is why it is a plain Server Component with no state: printing it is
  * `window.print()` on the page that already has the bill.
  *
- * **This carries no GSTIN and does not call itself a tax invoice.** It shows
- * the CGST/SGST split, because the guest is paying it either way and hiding it
- * helps nobody — but the wording that named the counter as the invoice issuer
- * was removed on request.
+ * **Whether this is a tax invoice is decided by one env var.** Set
+ * `NEXT_PUBLIC_SHOP_GSTIN` and the header prints the GSTIN and the paper calls
+ * itself a TAX INVOICE; leave it unset and it stays a plain customer copy.
  *
- * If this is ever meant to BE the legal invoice, it needs two more things: the
- * GSTIN in the header and the words "TAX INVOICE". Adding those while the
- * café's own software also issues one would put two invoice numbers against a
- * single payment, which is a filing problem rather than a cosmetic one.
+ * The two are deliberately tied together, because the failure mode is asymmetric:
+ * a receipt that says "TAX INVOICE" without a GSTIN on it is worse than useless
+ * to the guest, and a GSTIN printed on something that will not admit to being an
+ * invoice helps nobody either. One switch, both consequences.
+ *
+ * The reason it shipped without a GSTIN was that the café's own billing software
+ * issued the GST bill for the same sale, and two invoice numbers against one
+ * payment is a filing problem, not a cosmetic one. That software is no longer in
+ * the loop — this portal issues the only bill — so the reason is spent. **If the
+ * old POS is ever put back in front of the same sale, unset the GSTIN again.**
  *
  * Monospace and box-drawn on purpose: a thermal printer renders a fixed-width
  * column perfectly and proportional type badly.
@@ -23,10 +29,12 @@ import { formatDateTime } from '@/lib/utils';
 
 /** Shop identity. Env-driven so a second outlet needs no code change. */
 const SHOP = {
-  name: process.env.NEXT_PUBLIC_SHOP_NAME ?? 'TAPRIWALA',
+  name: process.env.NEXT_PUBLIC_SHOP_NAME ?? 'TAPRIWALA BY TREATMEETS',
   addressLine1: process.env.NEXT_PUBLIC_SHOP_ADDRESS_1 ?? '',
   addressLine2: process.env.NEXT_PUBLIC_SHOP_ADDRESS_2 ?? '',
   phone: process.env.NEXT_PUBLIC_SHOP_PHONE ?? '',
+  /** Set this and the paper becomes a tax invoice. See the note above. */
+  gstin: process.env.NEXT_PUBLIC_SHOP_GSTIN ?? '',
   footer: process.env.NEXT_PUBLIC_SHOP_FOOTER ?? 'THANK YOU ! VISIT AGAIN',
 };
 
@@ -84,6 +92,14 @@ export interface ReceiptData {
   tableCode: string;
   /** Absent when reprinting a stored bill — the export does not keep it. */
   sessionNumber?: number | null;
+  /**
+   * Every type on the bill, dining first.
+   *
+   * Optional because a `BillingExport` frozen before this field existed has no
+   * summary on it — such a bill was all dining, and is rendered from its lines
+   * instead. Present on every live consolidation.
+   */
+  orderTypes?: OrderType[];
   lines: {
     posName: string;
     quantity: number;
@@ -91,6 +107,8 @@ export interface ReceiptData {
     taxPercent: number;
     amount: number;
     taxAmount: number;
+    /** Absent on bills frozen before the field existed — those were dining. */
+    orderType?: OrderType;
   }[];
   subtotal: number;
   tax: number;
@@ -119,6 +137,28 @@ export function ReceiptSheet({ bill, billNumber, printedAt, isReprint }: Receipt
   }
   const rates = [...byRate.entries()].sort(([a], [b]) => a - b);
 
+  /*
+   * Which types this paper covers.
+   *
+   * Falls back to reading the lines when the summary is absent, so a bill
+   * saved before order types existed reprints as DINING rather than with a
+   * blank heading.
+   */
+  const types =
+    bill.orderTypes && bill.orderTypes.length > 0
+      ? bill.orderTypes
+      : [...new Set(bill.lines.map((line) => line.orderType ?? ORDER_TYPE.DINING))];
+
+  /*
+   * A mixed bill marks each line rather than trusting the heading.
+   *
+   * One heading over a bill that is half parcel is worse than none: the guest
+   * reads it, believes it covers everything, and queries the bill at the
+   * counter. The marker is a leading `*` and not a word because the name
+   * column is 14 characters wide and a word would eat half of it.
+   */
+  const isMixed = types.length > 1;
+
   return (
     <div className="receipt-sheet" aria-hidden>
       <pre className="receipt-body">
@@ -127,10 +167,16 @@ export function ReceiptSheet({ bill, billNumber, printedAt, isReprint }: Receipt
           centre(SHOP.addressLine1),
           centre(SHOP.addressLine2),
           SHOP.phone ? centre(`PH: ${SHOP.phone}`) : '',
+          SHOP.gstin ? centre(`GSTIN : ${SHOP.gstin}`) : '',
           '',
-          centre(isReprint ? 'DUPLICATE - CUSTOMER COPY' : 'CUSTOMER COPY'),
+          // A reprint must always announce itself, whichever kind of paper it
+          // is — the guest and the counter both need to know this is a second
+          // copy of one sale, not a second sale.
+          centre(isReprint ? 'DUPLICATE BILL' : SHOP.gstin ? 'TAX INVOICE' : 'CUSTOMER COPY'),
+          isReprint && SHOP.gstin ? centre('TAX INVOICE') : '',
           rule('='),
           `TABLE   : ${bill.tableCode}`,
+          `TYPE    : ${types.map((type) => ORDER_TYPE_LABEL[type].toUpperCase()).join(' + ')}`,
           bill.sessionNumber ? `SESSION : ${bill.sessionNumber}` : '',
           billNumber ? `BILL NO : ${billNumber}` : 'BILL NO : (not generated)',
           `DATE    : ${formatDateTime(printedAt)}`,
@@ -145,11 +191,20 @@ export function ReceiptSheet({ bill, billNumber, printedAt, isReprint }: Receipt
           .map((line) =>
             // The POS name, not the pretty menu name: this is the line the
             // counter has to reconcile against the software's own bill.
-            itemRow(line.posName, String(line.quantity), money(line.unitPrice), money(line.amount)),
+            itemRow(
+              isMixed && (line.orderType ?? ORDER_TYPE.DINING) === ORDER_TYPE.PARCEL
+                ? `*${line.posName}`
+                : line.posName,
+              String(line.quantity),
+              money(line.unitPrice),
+              money(line.amount),
+            ),
           )
           .join('\n')}
         {'\n'}
         {[
+          // The key for the per-line marker, printed only when there is one.
+          ...(isMixed ? [`* = ${ORDER_TYPE_LABEL[ORDER_TYPE.PARCEL].toUpperCase()}`] : []),
           rule(),
           `SUBTOTAL${money(bill.subtotal).padStart(WIDTH - 8)}`,
           `TAX  (+)${money(bill.tax).padStart(WIDTH - 8)}`,

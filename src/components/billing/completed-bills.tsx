@@ -3,6 +3,7 @@
 import Link from 'next/link';
 import { useMemo, useState } from 'react';
 
+import { IconBill, IconCheck, IconPrint, IconWarning } from '@/components/ui/icons';
 import { ReceiptSheet } from '@/components/billing/receipt-sheet';
 import { Button } from '@/components/ui/button';
 import { EmptyState, ErrorState, LoadingBlock } from '@/components/ui/feedback';
@@ -135,7 +136,7 @@ export function CompletedBills() {
 
         {bills.length === 0 ? (
           <EmptyState
-            icon="🧾"
+            icon={<IconBill />}
             title={trimmed ? `No bills for "${trimmed.toUpperCase()}"` : 'No bills generated yet'}
             description={
               trimmed
@@ -278,10 +279,18 @@ function BillList({ bills, canOpen, onPrint }: BillListProps) {
  */
 function PaidStatus({ bill }: { bill: BillingExport }) {
   if (bill.exportStatus === EXPORT_STATUS.CONFIRMED) {
-    return <span className="text-status-ready-ink text-sm font-semibold">✓ Paid</span>;
+    return (
+      <span className="text-status-ready-ink flex items-center gap-1 text-sm font-semibold">
+        <IconCheck aria-hidden className="size-4 shrink-0" /> Paid
+      </span>
+    );
   }
   if (bill.exportStatus === EXPORT_STATUS.FAILED) {
-    return <span className="text-status-cancelled-ink text-sm font-semibold">✕ Failed</span>;
+    return (
+      <span className="text-status-cancelled-ink flex items-center gap-1 text-sm font-semibold">
+        <IconWarning aria-hidden className="size-4 shrink-0" /> Failed
+      </span>
+    );
   }
   return <span className="text-ink-muted text-sm">— Not settled</span>;
 }
@@ -293,9 +302,9 @@ function PrintButton({ bill, onPrint }: { bill: BillingExport; onPrint: () => vo
       type="button"
       onClick={onPrint}
       aria-label={`Print bill ${bill.billNumber} for table ${bill.tableCode}`}
-      className="border-line bg-surface hover:bg-surface-muted min-h-touch rounded-lg border px-3 text-sm font-semibold"
+      className="border-line bg-surface hover:bg-surface-muted min-h-touch flex items-center gap-1.5 rounded-lg border px-3 text-sm font-semibold"
     >
-      🖨 Print
+      <IconPrint aria-hidden className="size-4 shrink-0" /> Print
     </button>
   );
 }

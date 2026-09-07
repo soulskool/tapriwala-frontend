@@ -1,5 +1,6 @@
 'use client';
 
+import { IconSearch } from '@/components/ui/icons';
 import { useMemo, useState } from 'react';
 
 import { MenuCategoryTabs } from '@/components/menu/menu-category-tabs';
@@ -65,7 +66,7 @@ export function ItemPicker({ menu, quantityOf, onAdd, onSetQuantity }: ItemPicke
       ) : null}
 
       {items.length === 0 ? (
-        <EmptyState icon="🔍" title="No items match" />
+        <EmptyState icon={<IconSearch />} title="No items match" />
       ) : (
         <ul className="flex flex-col gap-2">
           {items.map((item) => (

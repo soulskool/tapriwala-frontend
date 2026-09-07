@@ -1,5 +1,6 @@
 'use client';
 
+import { ORDER_TYPE_LABEL } from '@/lib/constants';
 import type { ConsolidatedBill } from '@/lib/types';
 import { formatCurrency, formatDateTime } from '@/lib/utils';
 
@@ -13,7 +14,7 @@ export function BillSummary({ bill }: { bill: ConsolidatedBill }) {
   return (
     <div className="rounded-card border-line bg-surface print-sheet border p-4">
       <div className="mb-3 hidden text-center print:block">
-        <h2 className="text-xl font-bold">ACD Cafe</h2>
+        <h2 className="text-xl font-bold">Tapriwala by Treatmeets</h2>
         <p className="text-sm">
           Table {bill.tableCode} · Session #{bill.sessionNumber}
         </p>
@@ -21,6 +22,14 @@ export function BillSummary({ bill }: { bill: ConsolidatedBill }) {
       </div>
 
       <dl className="flex flex-col gap-2">
+        {/* Named on every bill, single-type ones included: "which of these did
+            they take away?" is asked at the counter often enough that leaving
+            it off only when the answer is boring makes it easy to miss when it
+            is not. */}
+        <Row
+          label="Order type"
+          value={bill.orderTypes.map((type) => ORDER_TYPE_LABEL[type]).join(' + ') || '—'}
+        />
         <Row label={`Subtotal (${bill.itemCount} items)`} value={formatCurrency(bill.subtotal)} />
         <Row label="Tax" value={formatCurrency(bill.tax)} />
         <div className="border-line mt-1 flex items-baseline justify-between border-t pt-3">

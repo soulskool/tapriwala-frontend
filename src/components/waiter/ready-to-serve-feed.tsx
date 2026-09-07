@@ -5,6 +5,7 @@ import Link from 'next/link';
 import { EmptyState } from '@/components/ui/feedback';
 import { ITEM_STATUS, UI_THRESHOLDS } from '@/lib/constants';
 import type { OrderRound } from '@/lib/types';
+import { IconFloor } from '@/components/ui/icons';
 import { cn, formatElapsed } from '@/lib/utils';
 
 interface ReadyToServeFeedProps {
@@ -22,7 +23,7 @@ interface ReadyToServeFeedProps {
  */
 export function ReadyToServeFeed({ rounds, onServe, busyRoundId }: ReadyToServeFeedProps) {
   if (rounds.length === 0) {
-    return <EmptyState icon="🍽" title="Nothing waiting to be served" />;
+    return <EmptyState icon={<IconFloor />} title="Nothing waiting to be served" />;
   }
 
   return (

@@ -8,6 +8,7 @@ import { EmptyState, ErrorState, LoadingBlock } from '@/components/ui/feedback';
 import { StatusPill } from '@/components/ui/status-pill';
 import { SESSION_STATUS } from '@/lib/constants';
 import type { BillingQueueEntry, LiveTableTile } from '@/lib/types';
+import { IconBill, IconCheck, IconWarning } from '@/components/ui/icons';
 import { cn, formatCurrency, formatElapsed } from '@/lib/utils';
 import { apiErrorMessage } from '@/store/api/base-query';
 import { useBillingQueueQuery } from '@/store/api/billing-api';
@@ -84,7 +85,7 @@ export function BillingQueueClient() {
 
           {waiting.length === 0 ? (
             <EmptyState
-              icon="🧾"
+              icon={<IconBill />}
               title="Nobody is waiting to pay"
               description="Tables appear here the moment a guest or waiter requests the bill."
             />
@@ -106,7 +107,7 @@ export function BillingQueueClient() {
           </h2>
 
           {otherOpen.length === 0 ? (
-            <EmptyState icon="✓" title="No other tables are open" />
+            <EmptyState icon={<IconCheck />} title="No other tables are open" />
           ) : (
             <ul className="grid gap-2.5 sm:grid-cols-2 xl:grid-cols-4">
               {otherOpen.map((tile) => (
@@ -187,7 +188,8 @@ function BillingQueueCard({ entry }: { entry: BillingQueueEntry }) {
             discrepancy be absorbed silently. */}
         {entry.heldForReview ? (
           <p className="bg-status-pending-soft text-status-pending-ink rounded-lg px-2.5 py-1.5 text-sm font-medium">
-            ⚠ Held for review{entry.reviewNote ? ` — ${entry.reviewNote}` : ''}
+            <IconWarning aria-hidden className="mr-1 inline size-4" /> Held for review
+            {entry.reviewNote ? ` — ${entry.reviewNote}` : ''}
           </p>
         ) : null}
       </Link>

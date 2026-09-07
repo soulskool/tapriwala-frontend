@@ -1,6 +1,6 @@
 import { createSlice, type PayloadAction } from '@reduxjs/toolkit';
 
-import { CART_LIMITS } from '@/lib/constants';
+import { CART_LIMITS, ORDER_TYPE, type OrderType } from '@/lib/constants';
 import type { CartLine } from '@/lib/types';
 import { newIdempotencyKey } from '@/lib/utils';
 
@@ -18,6 +18,16 @@ import { newIdempotencyKey } from '@/lib/utils';
 
 export interface Cart {
   lines: CartLine[];
+  /**
+   * Dining or parcel, chosen before the cart is sent.
+   *
+   * Held per scope alongside the lines, so a waiter building a parcel for M2
+   * and a dine-in round for R4 cannot get the two crossed. Reset to dining on
+   * submit with everything else: the *next* order on this table is a fresh
+   * decision, and leaving a sticky "parcel" behind is how a dine-in round gets
+   * sent to the kitchen with the wrong heading on the paper.
+   */
+  orderType: OrderType;
   /**
    * Generated once per cart, sent with the round, and only rotated after a
    * successful submit. That is what makes a double-tapped button, or a retry
@@ -63,7 +73,15 @@ const initialState: CartState = { carts: {} };
 
 /** Returns the cart for a scope, creating an empty one on first touch. */
 function cartFor(state: CartState, scope: string): Cart {
-  state.carts[scope] ??= { lines: [], idempotencyKey: newIdempotencyKey() };
+  state.carts[scope] ??= {
+    lines: [],
+    orderType: ORDER_TYPE.DINING,
+    idempotencyKey: newIdempotencyKey(),
+  };
+  // A cart persisted before this field existed has no type on it. Reading it
+  // back as undefined would send `orderType: undefined` to the API and print a
+  // KOT with a blank heading.
+  state.carts[scope].orderType ??= ORDER_TYPE.DINING;
   return state.carts[scope];
 }
 
@@ -84,6 +102,12 @@ const cartSlice = createSlice({
     /** Restores persisted carts on mount. Client-only; never runs during SSR. */
     cartsHydrated(state) {
       state.carts = loadPersistedCarts();
+    },
+
+    /** The Dining / Parcel toggle. Staff screens only — see ORDER_TYPE. */
+    setCartOrderType(state, action: PayloadAction<{ scope: string; orderType: OrderType }>) {
+      cartFor(state, action.payload.scope).orderType = action.payload.orderType;
+      persistCarts(state.carts);
     },
 
     addLine(
@@ -167,7 +191,11 @@ const cartSlice = createSlice({
      * a retry of the one just sent still carries the old key.
      */
     cartSubmitted(state, action: PayloadAction<{ scope: string }>) {
-      state.carts[action.payload.scope] = { lines: [], idempotencyKey: newIdempotencyKey() };
+      state.carts[action.payload.scope] = {
+        lines: [],
+        orderType: ORDER_TYPE.DINING,
+        idempotencyKey: newIdempotencyKey(),
+      };
       persistCarts(state.carts);
     },
 
@@ -180,6 +208,7 @@ const cartSlice = createSlice({
 
 export const {
   cartsHydrated,
+  setCartOrderType,
   addLine,
   setLineQuantity,
   setLineInstructions,

@@ -1,6 +1,6 @@
 import { createApi } from '@reduxjs/toolkit/query/react';
 
-import type { ItemStatus } from '@/lib/constants';
+import type { ItemStatus, OrderType } from '@/lib/constants';
 import type {
   OrderItemInput,
   OrderRound,
@@ -68,10 +68,19 @@ export const sessionApi = createApi({
      * `idempotencyKey` is required by the caller, not optional: a double-tapped
      * button or a retry after dropped Wi-Fi must return the original round
      * rather than send a second ticket to the kitchen.
+     *
+     * `orderType` is required for the same class of reason, one step earlier:
+     * left optional it would be forgotten at a call site and the round would
+     * quietly default to dining, which is a parcel handed to a table.
      */
     placeRound: builder.mutation<
       PlacedOrder,
-      { sessionId: string; items: OrderItemInput[]; idempotencyKey: string }
+      {
+        sessionId: string;
+        items: OrderItemInput[];
+        orderType: OrderType;
+        idempotencyKey: string;
+      }
     >({
       query: ({ sessionId, ...body }) => ({
         url: `/sessions/${sessionId}/rounds`,

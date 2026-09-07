@@ -13,6 +13,7 @@ import type {
   ItemStatus,
   KitchenStation,
   OrderSource,
+  OrderType,
   Role,
   RoundStatus,
   ServiceRequestStatus,
@@ -178,6 +179,8 @@ export interface OrderRound {
   tableCode: string;
   roundNumber: number;
   source: OrderSource;
+  /** Dining or parcel. Staff choose it; a guest's order is always dining. */
+  orderType: OrderType;
   placedBy: { role: string; userId: string | null; name: string };
   items: OrderItem[];
   kotId: string;
@@ -250,6 +253,10 @@ export interface KdsTicket {
   roundNumber: number;
   isAddOn: boolean;
   source: OrderSource;
+  /** The heading the KOT prints and the badge on the card. */
+  orderType: OrderType;
+  /** Who sent it — printed on the KOT as the server name. */
+  placedByName: string;
   placedAt: string;
   elapsedMinutes: number;
   status: RoundStatus;
@@ -317,6 +324,12 @@ export interface ConsolidatedLine {
   amount: number;
   taxAmount: number;
   kitchenStation: KitchenStation;
+  /**
+   * Part of the grouping key server-side, so three teas drunk here and one
+   * carried out are two lines rather than one that is wrong about a quarter
+   * of itself.
+   */
+  orderType: OrderType;
   /** Which rounds this quantity came from, for staff drill-down. */
   rounds: number[];
 }
@@ -334,6 +347,11 @@ export interface ConsolidatedBill {
   total: number;
   roundCount: number;
   itemCount: number;
+  /**
+   * Every type present on the bill, dining first. One entry prints as a single
+   * heading; two means the receipt marks the lines individually instead.
+   */
+  orderTypes: OrderType[];
   /** Items were cancelled after cooking started — a manager should look. */
   requiresReview: boolean;
 }
@@ -351,6 +369,8 @@ export interface BillingExportLine {
   productCode: string;
   /** The name the legacy POS knows. What gets printed on the receipt. */
   posName: string;
+  /** Frozen with the price — a reprint has to know which lines went out. */
+  orderType: OrderType;
   quantity: number;
   unitPrice: number;
   taxPercent: number;

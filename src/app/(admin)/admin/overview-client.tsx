@@ -4,7 +4,8 @@ import Link from 'next/link';
 
 import { TableGrid } from '@/components/table/table-grid';
 import { ErrorState, LoadingBlock } from '@/components/ui/feedback';
-import { SERVICE_REQUEST_ICON, cn, formatCurrency, formatElapsed } from '@/lib/utils';
+import { SERVICE_REQUEST_ICON } from '@/components/ui/icons';
+import { cn, formatCurrency, formatElapsed } from '@/lib/utils';
 import { useOverviewQuery } from '@/store/api/admin-api';
 import { apiErrorMessage } from '@/store/api/base-query';
 
@@ -68,29 +69,34 @@ export function OverviewClient() {
               <Muted>Nobody is waiting.</Muted>
             ) : (
               <ul className="flex flex-col gap-1.5">
-                {serviceRequests.map((request) => (
-                  <li
-                    key={request.requestId ?? request._id}
-                    className={cn(
-                      'flex items-center gap-2 rounded-lg px-2.5 py-1.5 text-sm',
-                      request.isEscalated ? 'bg-status-cancelled-soft' : 'bg-surface-muted',
-                    )}
-                  >
-                    <span aria-hidden>{SERVICE_REQUEST_ICON[request.type]}</span>
-                    <span className="font-semibold">{request.tableCode}</span>
-                    <span className="text-ink-muted flex-1">{request.type.replace('_', ' ')}</span>
-                    <span
+                {serviceRequests.map((request) => {
+                  const Icon = SERVICE_REQUEST_ICON[request.type];
+                  return (
+                    <li
+                      key={request.requestId ?? request._id}
                       className={cn(
-                        'tabular-nums',
-                        request.isEscalated
-                          ? 'text-status-cancelled-ink font-semibold'
-                          : 'text-ink-muted',
+                        'flex items-center gap-2 rounded-lg px-2.5 py-1.5 text-sm',
+                        request.isEscalated ? 'bg-status-cancelled-soft' : 'bg-surface-muted',
                       )}
                     >
-                      {formatElapsed(request.waitingMinutes)}
-                    </span>
-                  </li>
-                ))}
+                      <Icon aria-hidden className="size-4 shrink-0" />
+                      <span className="font-semibold">{request.tableCode}</span>
+                      <span className="text-ink-muted flex-1">
+                        {request.type.replace('_', ' ')}
+                      </span>
+                      <span
+                        className={cn(
+                          'tabular-nums',
+                          request.isEscalated
+                            ? 'text-status-cancelled-ink font-semibold'
+                            : 'text-ink-muted',
+                        )}
+                      >
+                        {formatElapsed(request.waitingMinutes)}
+                      </span>
+                    </li>
+                  );
+                })}
               </ul>
             )}
           </Panel>

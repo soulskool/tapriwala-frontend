@@ -24,7 +24,7 @@ export default async function LoginPage({
           <div className="bg-brand-600 mx-auto mb-3 flex size-14 items-center justify-center rounded-2xl text-2xl shadow-lg">
             ☕
           </div>
-          <h1 className="text-2xl font-bold tracking-tight">ACD Cafe</h1>
+          <h1 className="text-2xl font-bold tracking-tight">Tapriwala by Treatmeets</h1>
           <p className="text-ink-muted mt-1 text-sm">Sign in to your shift</p>
         </div>
 

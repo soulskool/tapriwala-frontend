@@ -4,6 +4,7 @@ import Link from 'next/link';
 import { useRouter } from 'next/navigation';
 import { useEffect } from 'react';
 
+import { IconBill, IconFloor, IconKitchen, IconOverview } from '@/components/ui/icons';
 import { ROLE_HOME, ROLES } from '@/lib/constants';
 import { useAppSelector } from '@/store/hooks';
 
@@ -11,12 +12,27 @@ const ENTRY_POINTS = [
   {
     href: ROLE_HOME[ROLES.WAITER],
     label: 'Floor',
-    icon: '🍽',
+    icon: IconFloor,
     blurb: 'Live table grid and ordering',
   },
-  { href: ROLE_HOME[ROLES.KITCHEN], label: 'Kitchen', icon: '👨‍🍳', blurb: 'Live ticket board' },
-  { href: ROLE_HOME[ROLES.BILLING], label: 'Billing', icon: '🧾', blurb: 'Consolidate and close' },
-  { href: ROLE_HOME[ROLES.ADMIN], label: 'Admin', icon: '📊', blurb: 'Overview and master data' },
+  {
+    href: ROLE_HOME[ROLES.KITCHEN],
+    label: 'Kitchen',
+    icon: IconKitchen,
+    blurb: 'Live ticket board',
+  },
+  {
+    href: ROLE_HOME[ROLES.BILLING],
+    label: 'Billing',
+    icon: IconBill,
+    blurb: 'Consolidate and close',
+  },
+  {
+    href: ROLE_HOME[ROLES.ADMIN],
+    label: 'Admin',
+    icon: IconOverview,
+    blurb: 'Overview and master data',
+  },
 ];
 
 /**
@@ -41,7 +57,7 @@ export default function HomePage() {
         <div className="bg-brand-600 mx-auto mb-4 flex size-16 items-center justify-center rounded-2xl text-3xl shadow-lg">
           ☕
         </div>
-        <h1 className="text-3xl font-bold tracking-tight">ACD Cafe</h1>
+        <h1 className="text-3xl font-bold tracking-tight">Tapriwala by Treatmeets</h1>
         <p className="text-ink-muted mt-2">Ordering, kitchen display and billing</p>
       </div>
 
@@ -52,9 +68,7 @@ export default function HomePage() {
             href={entry.href}
             className="rounded-card border-line bg-surface hover:border-brand-300 hover:bg-brand-50 flex items-center gap-3 border px-4 py-4 transition"
           >
-            <span aria-hidden className="text-2xl">
-              {entry.icon}
-            </span>
+            <entry.icon aria-hidden className="text-brand-600 size-6 shrink-0" />
             <span>
               <span className="block font-semibold">{entry.label}</span>
               <span className="text-ink-muted block text-sm">{entry.blurb}</span>

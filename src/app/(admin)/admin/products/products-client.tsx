@@ -1,6 +1,7 @@
 'use client';
 
 import Image from 'next/image';
+import { IconDelete, IconProducts } from '@/components/ui/icons';
 import { useRef, useState } from 'react';
 
 import { Button } from '@/components/ui/button';
@@ -167,7 +168,7 @@ export function ProductsClient() {
       </header>
 
       {visible.length === 0 ? (
-        <EmptyState icon="📋" title="No items match" />
+        <EmptyState icon={<IconProducts />} title="No items match" />
       ) : (
         <div className="rounded-card border-line bg-surface overflow-x-auto border">
           <table className="w-full min-w-[52rem] text-left">
@@ -280,7 +281,7 @@ export function ProductsClient() {
                           title="Remove photo"
                           className="border-line text-ink-muted hover:border-status-cancelled min-h-9 rounded-lg border px-2.5 text-sm"
                         >
-                          🗑
+                          <IconDelete aria-hidden className="size-4" />
                         </button>
                       ) : null}
                     </div>

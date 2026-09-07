@@ -88,6 +88,31 @@ export const ORDER_SOURCE = {
 
 export type OrderSource = (typeof ORDER_SOURCE)[keyof typeof ORDER_SOURCE];
 
+/**
+ * Whether a round is eaten at the table or carried out. Mirrors the backend.
+ *
+ * On the round, not the session: one occupancy genuinely mixes the two, and the
+ * round is already the unit the KOT and the KDS card are built from.
+ *
+ * A guest's phone never sends this — the public endpoint ignores the field, so
+ * `parcel` can only ever come from a staff device. Do not add the toggle to the
+ * customer order screen without changing the backend first; it would render a
+ * control that silently does nothing.
+ */
+export const ORDER_TYPE = {
+  DINING: 'dining',
+  PARCEL: 'parcel',
+} as const;
+
+export type OrderType = (typeof ORDER_TYPE)[keyof typeof ORDER_TYPE];
+export const ORDER_TYPE_VALUES = Object.values(ORDER_TYPE) as OrderType[];
+
+/** Screen label. The KOT and the receipt print the uppercase form themselves. */
+export const ORDER_TYPE_LABEL: Record<OrderType, string> = {
+  [ORDER_TYPE.DINING]: 'Dining',
+  [ORDER_TYPE.PARCEL]: 'Parcel',
+};
+
 export const ITEM_STATUS = {
   PENDING: 'pending',
   ACCEPTED: 'accepted',
