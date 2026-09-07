@@ -93,6 +93,8 @@ export const billingApi = createApi({
         sessionId?: string;
         /** Narrows the history to one table, e.g. "M2". */
         tableCode?: string;
+        /** true = paid only, false = everything not paid. Omit for both. */
+        settled?: boolean;
         page?: number;
         limit?: number;
       } | void
@@ -118,6 +120,59 @@ export const billingApi = createApi({
  * the same session cookie the rest of the screen uses, so the download honours
  * exactly the same permissions.
  */
+export interface BillsXlsxFilter {
+  /** ISO date, inclusive. */
+  from?: string;
+  /** ISO date, inclusive. */
+  to?: string;
+  /** true = paid only, false = unsettled only, undefined = every bill. */
+  settled?: boolean;
+  tableCode?: string;
+}
+
+/**
+ * Downloads the bill history as an Excel workbook.
+ *
+ * Outside RTK Query for the same reason `downloadBillCsv` is: the response is
+ * a file, and caching a binary blob in the store would be pure waste. The
+ * server does the filtering and writes the sheet — the browser never holds the
+ * whole history in memory, and a phone on café Wi-Fi downloads one file rather
+ * than paging through the lot.
+ */
+export async function downloadBillsXlsx(filter: BillsXlsxFilter, filename: string): Promise<void> {
+  const params = new URLSearchParams();
+  if (filter.from) params.set('from', filter.from);
+  if (filter.to) params.set('to', filter.to);
+  if (filter.tableCode) params.set('tableCode', filter.tableCode);
+  // Only sent when a side was chosen — absent means "every bill".
+  if (filter.settled !== undefined) params.set('settled', String(filter.settled));
+
+  const response = await fetch(`${API_BASE_URL}/billing/exports/xlsx?${params.toString()}`, {
+    credentials: 'include',
+  });
+
+  if (!response.ok) {
+    // The server answers errors as the usual JSON envelope, so surface its
+    // message rather than a generic one — a 403 here means the wrong role.
+    let message = 'Could not download the spreadsheet';
+    try {
+      const body = (await response.json()) as { error?: { message?: string } };
+      if (body.error?.message) message = body.error.message;
+    } catch {
+      /* a non-JSON failure keeps the default message */
+    }
+    throw new Error(message);
+  }
+
+  const blob = await response.blob();
+  const url = URL.createObjectURL(blob);
+  const link = document.createElement('a');
+  link.href = url;
+  link.download = filename;
+  link.click();
+  URL.revokeObjectURL(url);
+}
+
 export async function downloadBillCsv(sessionId: string, filename: string): Promise<void> {
   const response = await fetch(`${API_BASE_URL}/billing/${sessionId}/csv`, {
     credentials: 'include',

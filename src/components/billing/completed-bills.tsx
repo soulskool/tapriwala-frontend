@@ -3,7 +3,8 @@
 import Link from 'next/link';
 import { useMemo, useState } from 'react';
 
-import { IconBill, IconCheck, IconPrint, IconWarning } from '@/components/ui/icons';
+import { IconBill, IconCheck, IconDownload, IconPrint, IconWarning } from '@/components/ui/icons';
+import { ExportBillsModal } from '@/components/billing/export-bills-modal';
 import { ReceiptSheet } from '@/components/billing/receipt-sheet';
 import { Button } from '@/components/ui/button';
 import { EmptyState, ErrorState, LoadingBlock } from '@/components/ui/feedback';
@@ -54,6 +55,15 @@ export function CompletedBills() {
    */
   const user = useAppSelector((state) => state.auth.user);
   const canOpenSession = canAccess(user, [ROLES.BILLING]);
+
+  /*
+   * Mirrors `authorize(ROLES.BILLING)` on `/billing/exports/xlsx`, admin bypass
+   * included. A waiter may read one table's bills to settle a question at the
+   * table, but a spreadsheet of every bill and everything still unpaid is a
+   * management question — so they do not get the button that would 403.
+   */
+  const canExport = canAccess(user, [ROLES.BILLING]);
+  const [exportOpen, setExportOpen] = useState(false);
 
   function handlePrint(bill: BillingExport) {
     setPrinting(bill);
@@ -124,13 +134,21 @@ export function CompletedBills() {
             />
           </div>
 
-          <div role="group" aria-label="Grouping" className="flex gap-2">
-            <GroupButton active={grouping === 'recent'} onClick={() => setGrouping('recent')}>
-              Most recent
-            </GroupButton>
-            <GroupButton active={grouping === 'table'} onClick={() => setGrouping('table')}>
-              By table
-            </GroupButton>
+          <div className="flex flex-wrap items-center gap-2">
+            <div role="group" aria-label="Grouping" className="flex gap-2">
+              <GroupButton active={grouping === 'recent'} onClick={() => setGrouping('recent')}>
+                Most recent
+              </GroupButton>
+              <GroupButton active={grouping === 'table'} onClick={() => setGrouping('table')}>
+                By table
+              </GroupButton>
+            </div>
+
+            {canExport ? (
+              <Button variant="secondary" onClick={() => setExportOpen(true)}>
+                <IconDownload aria-hidden className="mr-1.5 inline size-4" /> Export to Excel
+              </Button>
+            ) : null}
           </div>
         </div>
 
@@ -178,6 +196,8 @@ export function CompletedBills() {
           </div>
         ) : null}
       </div>
+
+      <ExportBillsModal open={exportOpen} onClose={() => setExportOpen(false)} />
     </>
   );
 }
