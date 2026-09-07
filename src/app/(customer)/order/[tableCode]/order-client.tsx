@@ -333,7 +333,9 @@ export function OrderClient({ tableCode, initialTable, initialMenu }: OrderClien
       {!cart.isEmpty ? (
         <div className="border-line bg-surface/95 fixed inset-x-0 bottom-0 z-30 border-t px-4 pt-3 pb-[max(0.75rem,env(safe-area-inset-bottom))] backdrop-blur">
           <div className="mx-auto flex max-w-2xl items-center gap-3">
-            <div className="flex-1">
+            {/* `min-w-0` so a long total shrinks this column instead of
+                shouldering "View order" off the right edge of a small phone. */}
+            <div className="min-w-0 flex-1">
               <p className="text-ink-muted text-sm">
                 {cart.totals.itemCount} {cart.totals.itemCount === 1 ? 'item' : 'items'}
               </p>

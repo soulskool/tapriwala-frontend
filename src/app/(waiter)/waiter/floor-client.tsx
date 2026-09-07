@@ -99,8 +99,11 @@ export function FloorClient() {
     );
   }
 
+  // `grid-cols-1` is deliberate: without a mobile template the implicit `auto`
+  // track sizes to its content's max-content and inflates the whole page
+  // sideways. `repeat(1, minmax(0,1fr))` gives the track a zero floor.
   return (
-    <div className="grid gap-5 lg:grid-cols-[1fr_22rem]">
+    <div className="grid grid-cols-1 gap-5 lg:grid-cols-[1fr_22rem]">
       <div className="flex flex-col gap-4">
         <div className="flex flex-wrap items-center gap-3">
           <Stat label="Tables in use" value={`${summary.occupied}/${summary.total}`} />

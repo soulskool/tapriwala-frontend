@@ -1,7 +1,30 @@
 import { createApi } from '@reduxjs/toolkit/query/react';
 
-import type { MenuCategory, Paginated, Product } from '@/lib/types';
+import type { ApiEnvelope, MenuCategory, Paginated, Product } from '@/lib/types';
 import { baseQuery, unwrap, unwrapPaginated } from './base-query';
+
+/**
+ * `/products` and `/products/menu` do not agree on the id field.
+ *
+ * `/products/menu` is a hand-built projection and returns `id`. `/products` is
+ * the admin list and returns the raw Mongoose document, which is keyed `_id`.
+ * `Product` declares `id`, so nothing failed to compile — `product.id` was
+ * simply `undefined` at runtime on every row of the Product Master.
+ *
+ * That was not cosmetic. `handleSave` branches on `editing.id` to choose
+ * update-or-create, so "Edit" silently became "Create" and collided with the
+ * unique product code; image upload and delete addressed `undefined`; the
+ * availability toggle had no id to send; and React warned about missing keys.
+ *
+ * Normalised here rather than at each call site so the type is true for every
+ * consumer, present and future.
+ */
+type RawProduct = Product & { _id?: string };
+
+function withId(product: RawProduct): Product {
+  const { _id, ...rest } = product;
+  return { ...rest, id: product.id ?? _id ?? '' };
+}
 
 /**
  * The menu, for staff screens and for admin's Product Master.
@@ -34,7 +57,10 @@ export const menuApi = createApi({
       } | void
     >({
       query: (params) => ({ url: '/products', params: params ?? undefined }),
-      transformResponse: unwrapPaginated<Product>,
+      transformResponse: (response: ApiEnvelope<RawProduct[]>): Paginated<Product> => {
+        const page = unwrapPaginated(response);
+        return { ...page, items: page.items.map(withId) };
+      },
       providesTags: ['Product'],
     }),
 

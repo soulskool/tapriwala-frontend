@@ -57,7 +57,10 @@ export function OverviewClient() {
         />
       </section>
 
-      <div className="grid gap-6 xl:grid-cols-[1fr_24rem]">
+      {/* `grid-cols-1` is deliberate: without a mobile template the implicit
+       `auto` track sizes to its content's max-content and inflates the whole
+       page sideways. `repeat(1, minmax(0,1fr))` gives it a zero floor. */}
+      <div className="grid grid-cols-1 gap-6 xl:grid-cols-[1fr_24rem]">
         <section aria-label="Floor">
           <h2 className="mb-3 text-lg font-bold">Floor</h2>
           <TableGrid tiles={tables} />

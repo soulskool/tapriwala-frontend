@@ -316,7 +316,10 @@ export function ConsolidationClient({ sessionId }: { sessionId: string }) {
         </p>
       ) : null}
 
-      <div className="grid gap-5 lg:grid-cols-[1fr_22rem]">
+      {/* `grid-cols-1` is deliberate: without a mobile template the implicit
+       `auto` track sizes to its content's max-content and inflates the whole
+       page sideways. `repeat(1, minmax(0,1fr))` gives it a zero floor. */}
+      <div className="grid grid-cols-1 gap-5 lg:grid-cols-[1fr_22rem]">
         <section
           aria-label="Consolidated items"
           className="rounded-card border-line bg-surface print-sheet overflow-x-auto border"

@@ -244,7 +244,11 @@ export function TableOrderClient({ tableId }: { tableId: string }) {
           </p>
         </div>
 
-        <div className="flex items-center gap-2">
+        {/* Wraps: with a live session this row holds the status pill plus up
+            to three buttons ("Request bill", "Bill this table", "Free table"),
+            which is ~100px wider than a 360px phone. Unwrapped, that scrolled
+            the entire page sideways and pushed the buttons off the edge. */}
+        <div className="flex flex-wrap items-center gap-2">
           <StatusPill status={tile.status} kind="tile" size="md" />
           {/* Kept for everyone, including billing: an admin crossing the floor
               may want to flag a table for whoever is actually on the counter
@@ -274,8 +278,24 @@ export function TableOrderClient({ tableId }: { tableId: string }) {
         </p>
       ) : null}
 
-      <div className="grid gap-5 lg:grid-cols-2">
-        <section aria-label="Running order" className="flex flex-col gap-3">
+      {/*
+       * `grid-cols-1` is load-bearing, not decoration.
+       *
+       * Without an explicit template the mobile grid gets an implicit `auto`
+       * track, and an `auto` track sizes to its content's MAX-content. The
+       * category chip strip below is 21 nowrap chips — 2400px laid out flat —
+       * so the track inflated to that, the columns stretched to the track, and
+       * the whole page became 2400px wide on every phone. The strip's own
+       * `overflow-x-auto` never engaged because it was handed all the width it
+       * asked for.
+       *
+       * `grid-cols-1` is `repeat(1, minmax(0, 1fr))`: the `0` floor stops
+       * max-content inflating the track. `min-w-0` on each column is the same
+       * guard one level down, since a grid item's default `min-width: auto`
+       * would otherwise let it push past its track.
+       */}
+      <div className="grid grid-cols-1 gap-5 lg:grid-cols-2">
+        <section aria-label="Running order" className="flex min-w-0 flex-col gap-3">
           <div className="flex items-baseline justify-between">
             <h2 className="text-lg font-bold">Running order</h2>
             {totals ? (
@@ -308,7 +328,7 @@ export function TableOrderClient({ tableId }: { tableId: string }) {
           )}
         </section>
 
-        <section aria-label="Add items" className="flex flex-col gap-3">
+        <section aria-label="Add items" className="flex min-w-0 flex-col gap-3">
           <h2 className="text-lg font-bold">Add items</h2>
           <ItemPicker
             menu={menu}

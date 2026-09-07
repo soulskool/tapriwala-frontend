@@ -186,7 +186,13 @@ export function KdsBoardClient() {
             <p className="text-ink-muted">New tickets appear here the moment they are placed.</p>
           </div>
         ) : (
-          <div className="grid grid-cols-[repeat(auto-fill,minmax(20rem,1fr))] gap-3">
+          /*
+           * `min(20rem,100%)` rather than a bare `20rem`: on a screen narrower
+           * than the 20rem floor the track cannot shrink to fit, and the board
+           * scrolls sideways. Tablets are wider than that, but a cook checking
+           * the board on a phone should not have to pan it.
+           */
+          <div className="grid grid-cols-[repeat(auto-fill,minmax(min(20rem,100%),1fr))] gap-3">
             {visible.map((ticket) => (
               <KotTicketCard
                 key={ticket.roundId}

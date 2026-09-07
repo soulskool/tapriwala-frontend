@@ -61,7 +61,20 @@ function MenuItemCardComponent({
           ) : null}
         </div>
 
-        <div className="flex items-center justify-between gap-2">
+        {/*
+         * Wraps rather than overflows.
+         *
+         * Neither the price nor the control can shrink — the stepper is three
+         * fixed 36px boxes, and truncating a price is not an option. Together
+         * with the 80px thumbnail that puts the card's floor at ~330px, which
+         * a 320px phone (or any phone with large accessibility text) cannot
+         * give it. Without `flex-wrap` the excess became sideways page scroll
+         * and the Add button sat off the right edge, reachable only by panning.
+         *
+         * Wrapping costs one extra line on the few phones that need it and
+         * changes nothing at 360px and above, where there is room.
+         */}
+        <div className="flex flex-wrap items-center justify-between gap-x-2 gap-y-1.5">
           <span className="font-semibold tabular-nums">{formatCurrency(item.price)}</span>
 
           {unavailable ? (
