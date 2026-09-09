@@ -318,15 +318,23 @@ body {
   /*
    * The one line the guest actually looks for.
    *
-   * Not on the 32-character grid — it is a flex row, so `space-between` pins
-   * the amount to the right edge of the sheet. That is why it was the first
-   * casualty when the sheet was wider than the paper: the label survived and
-   * the figure printed off the edge. 13pt keeps "NET TOTAL" plus a five-digit
-   * amount inside 70mm while still being the biggest thing on the bill.
+   * The only row on the bill that is NOT laid out in characters — it is a flex
+   * row, because the total is set larger than the grid and a padded string
+   * could not align at a different font size.
+   *
+   * That makes `width` load-bearing. `space-between` pushes the amount to this
+   * element's right edge, so if the element is allowed to fill the sheet the
+   * figure ends up 9mm right of the column of dashes above it and the total
+   * visibly overhangs the rest of the bill. It has to be pinned to the width
+   * of the character grid instead of the width of the paper: 32 characters of
+   * Courier at the 9pt body size, which is 32 × 0.6 × 9pt = 61mm.
+   *
+   * Keep this in step with the body font size. Change one, recompute the other.
    */
   .receipt-total {
     display: flex;
     justify-content: space-between;
+    width: 61mm;
     margin: 1mm 0;
     font-size: 13pt;
     font-weight: 700;
