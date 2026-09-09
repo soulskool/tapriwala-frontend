@@ -9,10 +9,11 @@ import { ReceiptSheet } from '@/components/billing/receipt-sheet';
  *
  * Two things are worth a test here and nothing else is:
  *
- *   1. **The 32-character grid.** 72mm of printable width at 10.5pt monospace
- *      fits exactly 32 characters. One over and the printer wraps the line,
- *      which turns a tidy column of prices into two ragged ones — and you only
- *      find out on paper, in front of a guest. Screen rendering never shows it.
+ *   1. **The 32-character grid.** One character over and the printer runs the
+ *      line off the edge of the roll — it does not wrap or shrink to fit, it
+ *      simply stops, and you only find out on paper in front of a guest.
+ *      Screen rendering never shows it. The other half of the contract is the
+ *      print font size in `globals.css`, sized so 32 characters fit the roll.
  *   2. **The money.** A receipt that prints the wrong total is a dispute at the
  *      counter.
  *
@@ -31,6 +32,7 @@ function line(over: Partial<ConsolidatedLine> = {}): ConsolidatedLine {
     amount: 50,
     taxAmount: 2.5,
     kitchenStation: 'Beverage',
+    orderType: 'dining',
     rounds: [1],
     ...over,
   };
@@ -50,6 +52,7 @@ function bill(over: Partial<ConsolidatedBill> = {}): ConsolidatedBill {
     total: 52.5,
     roundCount: 1,
     itemCount: 2,
+    orderTypes: ['dining'],
     requiresReview: false,
     ...over,
   };

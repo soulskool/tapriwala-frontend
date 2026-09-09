@@ -52,7 +52,6 @@ export function ProductsClient() {
 
   const [search, setSearch] = useState('');
   const debouncedSearch = useDebouncedValue(search);
-  const [showInactive, setShowInactive] = useState(false);
 
   /**
    * Paged, and searched server-side.
@@ -65,7 +64,10 @@ export function ProductsClient() {
    */
   const [page, setPage] = useState(1);
   const products = useListProductsQuery({
-    includeInactive: showInactive,
+    // `includeInactive` is omitted, so the server's default applies and
+    // retired items never reach this screen — `list()` adds `isActive: true`
+    // unless asked otherwise. Pass `includeInactive: true` here to bring them
+    // back; nothing else needs to change.
     search: debouncedSearch.trim() || undefined,
     page,
     limit: PAGE_SIZE,
@@ -151,19 +153,6 @@ export function ProductsClient() {
           className="min-h-touch border-line bg-surface min-w-56 flex-1 rounded-xl border px-4"
         />
 
-        <label className="flex items-center gap-2 text-sm">
-          <input
-            type="checkbox"
-            checked={showInactive}
-            onChange={(event) => {
-              setShowInactive(event.target.checked);
-              setPage(1);
-            }}
-            className="size-4"
-          />
-          Show retired
-        </label>
-
         <Button onClick={() => setEditing({ ...EMPTY_DRAFT })}>+ Add item</Button>
       </header>
 
@@ -202,6 +191,13 @@ export function ProductsClient() {
               {visible.map((product) => (
                 <tr
                   key={product.id}
+                  /*
+                   * Retired items are filtered out server-side, so this rarely
+                   * fires — but it is not dead. An item retired while this page
+                   * is open stays in the rendered list until the next refetch,
+                   * and it should look different from a live one for that
+                   * moment rather than silently passing for on-menu.
+                   */
                   className={cn('border-line border-b', !product.isActive && 'opacity-50')}
                 >
                   <td className="px-3 py-2">

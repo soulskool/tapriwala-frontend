@@ -194,14 +194,61 @@ body {
     display: none !important;
   }
 
+  /*
+   * Isolation is opt-in, not opt-out — but only once a sheet is mounted.
+   *
+   * This used to be purely opt-out: each screen tagged its own chrome
+   * `.print-hidden` and whatever was left went to the paper. The KOT preview
+   * is what proved that wrong. A native `<dialog>` carries no such class and
+   * lives in the browser's top layer, so it printed *itself* — title, blurb,
+   * Close and Print KOT buttons and all — across every page the job
+   * generated. A preview whose whole point was one 80mm ticket produced two
+   * sheets of the modal and no clean ticket.
+   *
+   * So when a sheet is mounted nothing reaches the paper unless it is that
+   * sheet, something inside it, or an ancestor it hangs from. Collapsing the
+   * rest to `display: none` is what makes the page height the ticket's height
+   * — `visibility: hidden` would keep the boxes and still feed blank paper.
+   *
+   * A screen that mounts no sheet is deliberately left alone, so the QR page
+   * and anything else still driving `window.print()` off `.print-hidden`
+   * keeps working exactly as it did.
+   */
+  body:has(.kot-sheet, .receipt-sheet)
+    *:not(:has(.kot-sheet, .receipt-sheet)):not(.kot-sheet, .kot-sheet *):not(
+      .receipt-sheet,
+      .receipt-sheet *
+    ) {
+    display: none !important;
+  }
+
+  /* The dialog is chrome, never paper. Belt and braces for the rule above. */
+  dialog::backdrop {
+    display: none !important;
+  }
+
   .receipt-sheet,
   .kot-sheet {
     display: block;
-    width: 72mm; /* 80mm roll less the printer's unprintable margins */
+    width: 70mm; /* 80mm roll less the printer's unprintable margins */
     margin: 0;
     padding: 3mm 0 8mm; /* trailing space so the tear-off misses the text */
     color: #000;
-    font-family: ui-monospace, 'Courier New', monospace;
+    /*
+     * `ui-monospace` is deliberately NOT in this stack.
+     *
+     * The sheets are 32-character grids, so the paper only fits if the glyph
+     * advance is known. `ui-monospace` resolves per platform — Consolas on
+     * Windows at 0.55em, Roboto Mono on Android at 0.6em, SF Mono on a Mac —
+     * so the same receipt was a different width on every device that printed
+     * it, and the counter's Android tablet drew the widest one. Courier New
+     * is 0.6em everywhere, which is what makes the sizing below arithmetic
+     * rather than a guess.
+     */
+    font-family: 'Courier New', monospace;
+    /* Thermal heads threshold what the browser hands them; stop it lightening. */
+    print-color-adjust: exact;
+    -webkit-print-color-adjust: exact;
   }
 
   /*
@@ -217,32 +264,71 @@ body {
     display: none !important;
   }
 
+  /*
+   * Font size here is arithmetic, not taste. Do not nudge it by eye.
+   *
+   * Both sheets lay 32 fixed-width characters (`WIDTH` in `receipt-sheet.tsx`
+   * and `kot-sheet.tsx`). Courier New advances 0.6em per character and 1pt is
+   * 0.3528mm, so a 32-character line measures:
+   *
+   *     32 × 0.6 × size(pt) × 0.3528  =  6.774 × size(pt)  mm
+   *
+   * Against the 70mm above that caps the size at **10.3pt**. Anything larger
+   * runs off the right-hand edge of the roll, and a thermal printer does not
+   * wrap or shrink to fit — it simply stops. That is exactly what the first
+   * live bills did: the receipt was set at 10.5pt (71.1mm) and the KOT at
+   * 12pt (81.3mm), so the GSTIN, the NET TOTAL figure and the whole SGST
+   * column were printed into thin air past the paper edge and the counter
+   * read it as a truncated order.
+   *
+   * 9pt keeps the receipt at 61mm and leaves real headroom for a printer
+   * whose printable width is nearer 70mm than 72mm.
+   */
   .receipt-body,
   .kot-body {
     margin: 0;
-    font-size: 10.5pt;
+    font-size: 9pt;
     line-height: 1.35;
     white-space: pre;
     font-family: inherit;
+    /*
+     * Bold is legibility, not emphasis.
+     *
+     * A thermal head burns dots at roughly 203dpi and thresholds whatever the
+     * browser rasterises. Regular-weight stems land as a single sparse row of
+     * dots and come out of the machine grey and washed out — which is how the
+     * first live bills printed. Bold puts two dot rows in every stem, so the
+     * paper reads properly black. If it is still faint after this, the
+     * remaining knob is the printer's own density setting, not CSS.
+     */
+    font-weight: 700;
   }
 
   /*
    * Bigger than the receipt on purpose. This is read at arm's length across a
    * hot kitchen, wet-handed, usually clipped to a rail — not held six inches
-   * from the face at a counter like the bill is.
+   * from the face at a counter like the bill is. 9.5pt is 64.4mm of the 70mm
+   * available — the largest step up the 32-character grid still allows.
    */
   .kot-body {
-    font-size: 12pt;
+    font-size: 9.5pt;
     line-height: 1.45;
-    font-weight: 700;
   }
 
-  /* The one line the guest actually looks for. */
+  /*
+   * The one line the guest actually looks for.
+   *
+   * Not on the 32-character grid — it is a flex row, so `space-between` pins
+   * the amount to the right edge of the sheet. That is why it was the first
+   * casualty when the sheet was wider than the paper: the label survived and
+   * the figure printed off the edge. 13pt keeps "NET TOTAL" plus a five-digit
+   * amount inside 70mm while still being the biggest thing on the bill.
+   */
   .receipt-total {
     display: flex;
     justify-content: space-between;
     margin: 1mm 0;
-    font-size: 15pt;
+    font-size: 13pt;
     font-weight: 700;
   }
 }

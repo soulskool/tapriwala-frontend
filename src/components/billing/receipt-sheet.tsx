@@ -41,10 +41,14 @@ const SHOP = {
 /**
  * Receipt columns are counted in characters, not pixels.
  *
- * 32 is what a 72mm printable width fits at 10.5pt in a monospace face, and it
- * is a hard limit: one character over and the printer wraps the line, which
- * turns a tidy column of prices into two ragged ones. Every row below is built
- * from ITEM_COLUMNS so the header can never drift out of step with the rows.
+ * 32 is a hard limit: one character over and the printer runs the line off the
+ * edge of the roll — it does not wrap or shrink to fit, it simply stops, and
+ * you find out on paper in front of a guest. Every row below is built from
+ * ITEM_COLUMNS so the header can never drift out of step with the rows.
+ *
+ * The matching half of this contract is the print font size in `globals.css`,
+ * which is derived from this number and the roll width. Changing 32 without
+ * redoing that arithmetic prints a truncated bill.
  */
 const WIDTH = 32;
 

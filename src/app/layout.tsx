@@ -18,6 +18,12 @@ export const metadata: Metadata = {
   // extension is ambiguous rather than additive. Replacing the logo means
   // replacing this file, not adding beside it.
   //
+  // `apple-icon.jpeg` beside it is a SEPARATE Next convention, not a second
+  // `icon.*` — it is what emits `<link rel="apple-touch-icon">`. Without it
+  // Safari probes `/apple-touch-icon.png` and `-precomposed.png` at the site
+  // root and logs two 404s no other browser generates. Keep the two files in
+  // step; deleting this one looks like de-duplication and is a regression.
+  //
   // The previous mark was a 256px PNG rendered down from an SVG, because that
   // SVG is 5 MB (the artwork is an embedded photo) and no tab is worth 5 MB on
   // café Wi-Fi. The same rule applies to whatever replaces this: keep the tab

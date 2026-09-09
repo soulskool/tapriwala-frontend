@@ -71,6 +71,8 @@ function ticket(over: Partial<KdsTicket> = {}): KdsTicket {
     roundNumber: 1,
     isAddOn: false,
     source: 'customer_qr',
+    orderType: 'dining',
+    placedByName: 'Cafe Admin',
     placedAt: '2026-09-03T09:57:35.139Z',
     elapsedMinutes: 0,
     status: 'pending',
