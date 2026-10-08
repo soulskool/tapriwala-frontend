@@ -1,4 +1,5 @@
 import { ITEM_STATUS, ORDER_TYPE_LABEL, type ItemStatus, type OrderType } from '@/lib/constants';
+import type { OrderRound } from '@/lib/types';
 import { formatDateTime } from '@/lib/utils';
 
 /**
@@ -104,6 +105,33 @@ export interface KotData {
     specialInstructions: string;
     status: ItemStatus;
   }[];
+}
+
+/**
+ * A waiter's round, as the paper's shape.
+ *
+ * The floor holds full `OrderRound`s, not KDS tickets, so it needs its own
+ * mapping — but it must land on the same `KotData`, so a KOT printed from the
+ * waiter's phone and a reprint from the kitchen board are the same characters.
+ * `placedBy.name` is blank on a guest's own order, exactly as the KDS ticket's
+ * `placedByName` is, so the SERVER line drops out the same way on both.
+ */
+export function kotFromRound(round: OrderRound): KotData {
+  return {
+    kotId: round.kotId,
+    tableCode: round.tableCode,
+    orderType: round.orderType,
+    roundNumber: round.roundNumber,
+    isAddOn: round.isAddOn,
+    placedAt: round.placedAt,
+    placedByName: round.placedBy.name,
+    items: round.items.map((item) => ({
+      displayName: item.displayName,
+      quantity: item.quantity,
+      specialInstructions: item.specialInstructions,
+      status: item.status,
+    })),
+  };
 }
 
 /**

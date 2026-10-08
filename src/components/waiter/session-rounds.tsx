@@ -4,7 +4,7 @@ import { OrderTypePill } from '@/components/ui/order-type-pill';
 import { StatusPill } from '@/components/ui/status-pill';
 import { ITEM_STATUS, type ItemStatus } from '@/lib/constants';
 import type { OrderItem, OrderRound } from '@/lib/types';
-import { IconDelete } from '@/components/ui/icons';
+import { IconDelete, IconPrint } from '@/components/ui/icons';
 import { cn, formatClockWithDay, formatCurrency, formatElapsed } from '@/lib/utils';
 
 interface SessionRoundsProps {
@@ -12,6 +12,11 @@ interface SessionRoundsProps {
   onItemStatus: (round: OrderRound, item: OrderItem, status: ItemStatus) => void;
   onCancelItem: (round: OrderRound, item: OrderItem) => void;
   busyItemId?: string | null;
+  /**
+   * Shows a Print KOT button on every round when given. Optional because the
+   * caller decides who may print from the floor, not this list.
+   */
+  onPrintKot?: (round: OrderRound) => void;
 }
 
 /**
@@ -26,6 +31,7 @@ export function SessionRounds({
   onItemStatus,
   onCancelItem,
   busyItemId,
+  onPrintKot,
 }: SessionRoundsProps) {
   return (
     <div className="flex flex-col gap-3">
@@ -53,6 +59,19 @@ export function SessionRounds({
                 {formatClockWithDay(round.placedAt)} · {formatElapsed(round.elapsedMinutes)}
               </span>
               <StatusPill status={round.status} />
+              {/* On every round and for the whole of its life, like the
+                  kitchen board's: the docket is taken to the kitchen by hand
+                  from here, and a lost one is reprinted from the same place. */}
+              {onPrintKot ? (
+                <button
+                  type="button"
+                  onClick={() => onPrintKot(round)}
+                  aria-label={`Preview and print KOT ${round.kotId}`}
+                  className="border-line text-ink hover:bg-surface-muted flex min-h-9 items-center gap-1.5 rounded-lg border px-2.5 font-semibold"
+                >
+                  <IconPrint aria-hidden className="size-4" /> Print KOT
+                </button>
+              ) : null}
             </div>
           </header>
 

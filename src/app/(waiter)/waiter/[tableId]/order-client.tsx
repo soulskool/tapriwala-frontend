@@ -4,6 +4,8 @@ import Link from 'next/link';
 import { useRouter } from 'next/navigation';
 import { useState } from 'react';
 
+import { KotPrintModal } from '@/components/kitchen/kot-print-modal';
+import { kotFromRound, type KotData } from '@/components/kitchen/kot-sheet';
 import { CartDrawer } from '@/components/menu/cart-drawer';
 import { Button } from '@/components/ui/button';
 import { TextAreaField } from '@/components/ui/field';
@@ -64,6 +66,12 @@ export function TableOrderClient({ tableId }: { tableId: string }) {
   // queue. Billing and admin can go straight to the bill from here instead.
   const canSettleTable = canAccess(user, [ROLES.BILLING]);
 
+  // Waiter (and admin, by the bypass) only. Billing staff walk the floor too,
+  // but the owner asked for this on the waiter's screen: the waiter is the one
+  // carrying the docket from the table to the kitchen. The kitchen board keeps
+  // its own Print KOT for reprints.
+  const canPrintKot = canAccess(user, [ROLES.WAITER]);
+
   const grid = useLiveGridQuery();
   const tile = grid.data?.tables.find((entry) => entry.tableId === tableId);
   const sessionId = tile?.sessionId ?? null;
@@ -86,6 +94,11 @@ export function TableOrderClient({ tableId }: { tableId: string }) {
   const [cancelReason, setCancelReason] = useState('');
   const [freeOpen, setFreeOpen] = useState(false);
   const [freeReason, setFreeReason] = useState('');
+  /**
+   * Snapshotted on press, as on the kitchen board: a socket tick landing while
+   * the preview is open must not change the sheet under the hand printing it.
+   */
+  const [printTarget, setPrintTarget] = useState<KotData | null>(null);
 
   // Freeing a table that never ordered anything is routine tidying and should
   // cost one tap. Freeing one that owes money is a decision, and a decision
@@ -324,6 +337,7 @@ export function TableOrderClient({ tableId }: { tableId: string }) {
               busyItemId={busyItemId}
               onItemStatus={(round, item, status) => void handleItemStatus(round, item, status)}
               onCancelItem={(round, item) => setCancelTarget({ round, item })}
+              onPrintKot={canPrintKot ? (round) => setPrintTarget(kotFromRound(round)) : undefined}
             />
           )}
         </section>
@@ -383,6 +397,12 @@ export function TableOrderClient({ tableId }: { tableId: string }) {
         submitLabel={`Send to kitchen · ${tile.code}`}
         orderType={cart.orderType}
         onOrderTypeChange={cart.setOrderType}
+      />
+
+      <KotPrintModal
+        kot={printTarget}
+        open={printTarget !== null}
+        onClose={() => setPrintTarget(null)}
       />
 
       <Modal
