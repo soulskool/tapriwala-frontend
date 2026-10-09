@@ -1,7 +1,13 @@
 import { createApi } from '@reduxjs/toolkit/query/react';
 
 import type { Role } from '@/lib/constants';
-import type { AdminOverview, AuditEntry, Paginated, StaffUser } from '@/lib/types';
+import type {
+  AdminOverview,
+  AuditEntry,
+  DailySalesReport,
+  Paginated,
+  StaffUser,
+} from '@/lib/types';
 import { baseQuery, unwrap, unwrapPaginated } from './base-query';
 
 /**
@@ -53,6 +59,7 @@ export const adminApi = createApi({
         entityType?: string;
         entityId?: string;
         sessionId?: string;
+        tableCode?: string;
         action?: string;
         from?: string;
         to?: string;
@@ -64,6 +71,19 @@ export const adminApi = createApi({
       transformResponse: unwrapPaginated<AuditEntry>,
       providesTags: ['Audit'],
     }),
+
+    /**
+     * What each day took, from paid bills only. Both dates are `YYYY-MM-DD`
+     * café days; leaving them out means the last 30 days.
+     *
+     * Refetched on every visit rather than kept live over the socket: this is
+     * read at the end of a shift, not watched during one.
+     */
+    dailySales: builder.query<DailySalesReport, { from?: string; to?: string } | void>({
+      query: (params) => ({ url: '/admin/sales/daily', params: params ?? undefined }),
+      transformResponse: unwrap<DailySalesReport>,
+      keepUnusedDataFor: 0,
+    }),
   }),
 });
 
@@ -73,4 +93,5 @@ export const {
   useCreateUserMutation,
   useUpdateUserMutation,
   useListAuditQuery,
+  useDailySalesQuery,
 } = adminApi;

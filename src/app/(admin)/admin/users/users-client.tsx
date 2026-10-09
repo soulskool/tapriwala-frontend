@@ -162,7 +162,11 @@ export function UsersClient() {
               error={fieldErrors.pin}
             />
 
-            {editing.id ? (
+            {editing.id && editing.role === ROLES.ADMIN ? (
+              // The API refuses to deactivate an admin — only an admin can
+              // reactivate anyone, so switching one off locks the shop out.
+              <p className="text-ink-muted text-sm">Admin accounts are always active.</p>
+            ) : editing.id ? (
               <label className="flex items-center gap-2 text-sm">
                 <input
                   type="checkbox"

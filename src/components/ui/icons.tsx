@@ -6,6 +6,7 @@ import {
   LuBellOff,
   LuBookText,
   LuCamera,
+  LuChartColumn,
   LuCheck,
   LuCheckCheck,
   LuChefHat,
@@ -103,6 +104,7 @@ export const IconProducts = LuClipboardList;
 export const IconTables = LuArmchair;
 export const IconStaff = LuUsers;
 export const IconAudit = LuHistory;
+export const IconSales = LuChartColumn;
 
 // ─── Status glyphs ───────────────────────────────────────────────────────────
 

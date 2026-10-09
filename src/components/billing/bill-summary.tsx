@@ -2,7 +2,7 @@
 
 import { ORDER_TYPE_LABEL } from '@/lib/constants';
 import type { ConsolidatedBill } from '@/lib/types';
-import { formatCurrency, formatDateTime } from '@/lib/utils';
+import { formatBillTotal, formatCurrency, formatDateTime } from '@/lib/utils';
 
 /**
  * The totals block, and the sheet that actually gets printed.
@@ -32,9 +32,15 @@ export function BillSummary({ bill }: { bill: ConsolidatedBill }) {
         />
         <Row label={`Subtotal (${bill.itemCount} items)`} value={formatCurrency(bill.subtotal)} />
         <Row label="Tax" value={formatCurrency(bill.tax)} />
+        {bill.roundOff ? (
+          <Row
+            label="Round off"
+            value={`${bill.roundOff < 0 ? '−' : '+'}${formatCurrency(Math.abs(bill.roundOff))}`}
+          />
+        ) : null}
         <div className="border-line mt-1 flex items-baseline justify-between border-t pt-3">
           <dt className="text-lg font-bold">Total</dt>
-          <dd className="text-2xl font-black tabular-nums">{formatCurrency(bill.total)}</dd>
+          <dd className="text-2xl font-black tabular-nums">{formatBillTotal(bill.total)}</dd>
         </div>
       </dl>
 

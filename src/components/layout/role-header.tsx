@@ -13,6 +13,7 @@ import {
   IconMenuToggle,
   IconOverview,
   IconProducts,
+  IconSales,
   IconStaff,
   IconTables,
   type IconType,
@@ -56,6 +57,7 @@ const NAV_BY_ROLE: Record<string, NavItem[]> = {
   ],
   [ROLES.ADMIN]: [
     { href: '/admin', label: 'Overview', icon: IconOverview },
+    { href: '/admin/sales', label: 'Sales', icon: IconSales },
     { href: '/waiter', label: 'Floor', icon: IconFloor },
     { href: '/kitchen', label: 'Kitchen', icon: IconKitchen },
     { href: '/billing', label: 'Billing', icon: IconBill },

@@ -85,6 +85,22 @@ function money(amount: number): string {
 }
 
 /**
+ * The NET TOTAL figure: whole rupees print as "452", not "452.00".
+ *
+ * Bills are rounded to the rupee, so the paise are always zero and the owner
+ * wants them off the paper. A bill saved before rounding began was charged in
+ * paise and reprints them, because that is what the guest paid.
+ */
+function netTotal(amount: number): string {
+  return Number.isInteger(amount) ? String(amount) : money(amount);
+}
+
+/** Money with its sign always shown — a round off can go either way. */
+function signedMoney(amount: number): string {
+  return `${amount < 0 ? '-' : '+'}${Math.abs(amount).toFixed(2)}`;
+}
+
+/**
  * The least a receipt needs.
  *
  * Deliberately structural rather than `ConsolidatedBill`: the same paper has to
@@ -116,6 +132,11 @@ export interface ReceiptData {
   }[];
   subtotal: number;
   tax: number;
+  /**
+   * total − (subtotal + tax). Optional because a bill saved before rounding
+   * has none; zero or absent prints no line at all.
+   */
+  roundOff?: number;
   total: number;
 }
 
@@ -212,13 +233,17 @@ export function ReceiptSheet({ bill, billNumber, printedAt, isReprint }: Receipt
           rule(),
           `SUBTOTAL${money(bill.subtotal).padStart(WIDTH - 8)}`,
           `TAX  (+)${money(bill.tax).padStart(WIDTH - 8)}`,
+          // Signed, so SUBTOTAL + TAX + ROUND OFF visibly equals NET TOTAL.
+          // Left off entirely when there is none, as on every old bill.
+          ...(bill.roundOff ? [`ROUND OFF${signedMoney(bill.roundOff).padStart(WIDTH - 9)}`] : []),
           rule('='),
         ].join('\n')}
       </pre>
 
       <p className="receipt-total">
         <span>NET TOTAL</span>
-        <span>{money(bill.total)}</span>
+        {/* Whole rupees, no ".00" — see `netTotal`. */}
+        <span>{netTotal(bill.total)}</span>
       </p>
 
       <pre className="receipt-body">

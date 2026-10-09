@@ -344,7 +344,10 @@ export interface ConsolidatedBill {
   cancelledLines: ConsolidatedLine[];
   subtotal: number;
   tax: number;
+  /** What the guest pays: subtotal + tax rounded to the whole rupee. */
   total: number;
+  /** total − (subtotal + tax), signed: +0.50 rounded up, −0.05 rounded down. */
+  roundOff: number;
   roundCount: number;
   itemCount: number;
   /**
@@ -399,6 +402,11 @@ export interface BillingExport {
   lineItems: BillingExportLine[];
   subtotal: number;
   tax: number;
+  /**
+   * Absent on bills saved before bills were rounded to the rupee. Those were
+   * charged to the paisa and had no round off, so absent reads as zero.
+   */
+  roundOff?: number;
   total: number;
   exportMethod: ExportMethod;
   exportStatus: ExportStatus;
@@ -408,6 +416,25 @@ export interface BillingExport {
   lastError: string | null;
   confirmedAt: string | null;
   note: string;
+}
+
+/** One café day's takings, from paid bills only. `date` is `YYYY-MM-DD` in IST. */
+export interface DailySalesRow {
+  date: string;
+  bills: number;
+  subtotal: number;
+  tax: number;
+  roundOff: number;
+  total: number;
+}
+
+export interface DailySalesReport {
+  from: string;
+  to: string;
+  timezone: string;
+  /** Newest first, every day in the range — a day with no bills reads zero. */
+  days: DailySalesRow[];
+  totals: Omit<DailySalesRow, 'date'>;
 }
 
 export interface ExportResult {
@@ -521,7 +548,10 @@ export interface AuditEntry {
   before: Record<string, unknown> | null;
   after: Record<string, unknown> | null;
   meta: Record<string, unknown> | null;
-  createdAt: string;
+  /** When it happened. The audit log has no createdAt — this is its clock. */
+  timestamp: string;
+  /** Menu names for the product codes this row mentions, looked up by the API. */
+  productNames?: Record<string, string>;
 }
 
 // ─── Cart (client-only state) ────────────────────────────────────────────────

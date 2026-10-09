@@ -14,7 +14,7 @@ import { ErrorState, LoadingBlock } from '@/components/ui/feedback';
 import { Modal } from '@/components/ui/modal';
 import { EXPORT_METHOD, EXPORT_STATUS, SESSION_STATUS } from '@/lib/constants';
 import type { BillingExport } from '@/lib/types';
-import { cn, formatCurrency, formatDateTime } from '@/lib/utils';
+import { cn, formatBillTotal, formatCurrency, formatDateTime } from '@/lib/utils';
 import { apiErrorMessage } from '@/store/api/base-query';
 import {
   downloadBillCsv,
@@ -32,12 +32,18 @@ import { toastPushed } from '@/store/slices/ui-slice';
  *
  * Sorted, so the order the server happens to return lines in can never make an
  * unchanged bill look changed.
+ *
+ * Built on subtotal + tax — the exact figure, in paise — and not on `total`.
+ * `total` is rounded to the rupee now, but a bill saved before rounding began
+ * kept its paisa total, so comparing totals would brand every such bill "out
+ * of date" against the very lines it was saved from.
  */
 function signature(
   lines: { productCode: string; quantity: number; unitPrice: number }[],
-  total: number,
+  subtotal: number,
+  tax: number,
 ): string {
-  return `${total}|${lines
+  return `${Math.round((subtotal + tax) * 100)}|${lines
     .map((line) => `${line.productCode}:${line.quantity}:${line.unitPrice}`)
     .sort()
     .join(',')}`;
@@ -96,7 +102,8 @@ export function ConsolidationClient({ sessionId }: { sessionId: string }) {
   const isStale = Boolean(
     savedBill &&
     bill.data &&
-    signature(savedBill.lineItems, savedBill.total) !== signature(bill.data.lines, bill.data.total),
+    signature(savedBill.lineItems, savedBill.subtotal, savedBill.tax) !==
+      signature(bill.data.lines, bill.data.subtotal, bill.data.tax),
   );
 
   /**
@@ -244,6 +251,20 @@ export function ConsolidationClient({ sessionId }: { sessionId: string }) {
   }
 
   const data = bill.data;
+
+  /**
+   * The money as charged.
+   *
+   * Once a bill is saved its total is the frozen one, not a fresh rounding of
+   * the live lines. Today the two are identical; for a bill saved before
+   * rounding began they are not, and a reprint must say what the guest was
+   * actually charged — ₹451.50, not ₹452.
+   */
+  const charged =
+    savedBill && !isStale
+      ? { ...data, total: savedBill.total, roundOff: savedBill.roundOff ?? 0 }
+      : data;
+
   const isClosed = data.status === SESSION_STATUS.CLOSED;
 
   /**
@@ -259,7 +280,7 @@ export function ConsolidationClient({ sessionId }: { sessionId: string }) {
     <div className="flex flex-col gap-5">
       {/* Screen-invisible; `@media print` is the only thing that reveals it. */}
       <ReceiptSheet
-        bill={data}
+        bill={charged}
         billNumber={isStale ? undefined : savedBill?.billNumber}
         printedAt={printedAt ?? data.openedAt}
         isReprint={printCount > 1}
@@ -380,7 +401,7 @@ export function ConsolidationClient({ sessionId }: { sessionId: string }) {
         </section>
 
         <aside className="flex flex-col gap-4">
-          <BillSummary bill={data} />
+          <BillSummary bill={charged} />
 
           {savedBill ? (
             <ExportPanel record={savedBill} isStale={isStale} onPrint={handlePrint} />
@@ -461,7 +482,7 @@ export function ConsolidationClient({ sessionId }: { sessionId: string }) {
         }
       >
         <p className="mb-3 text-lg font-semibold">
-          Total collected: <span className="tabular-nums">{formatCurrency(data.total)}</span>
+          Total collected: <span className="tabular-nums">{formatBillTotal(charged.total)}</span>
         </p>
         <TextAreaField
           label="Note (optional)"

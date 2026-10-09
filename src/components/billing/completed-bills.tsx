@@ -11,7 +11,7 @@ import { EmptyState, ErrorState, LoadingBlock } from '@/components/ui/feedback';
 import { TextField } from '@/components/ui/field';
 import { EXPORT_STATUS, ROLES } from '@/lib/constants';
 import type { BillingExport } from '@/lib/types';
-import { cn, formatClock, formatCurrency, formatDateTime, groupBy } from '@/lib/utils';
+import { cn, formatBillTotal, formatClock, formatDateTime, groupBy } from '@/lib/utils';
 import { apiErrorMessage } from '@/store/api/base-query';
 import { useListExportsQuery } from '@/store/api/billing-api';
 import { useAppSelector } from '@/store/hooks';
@@ -113,6 +113,7 @@ export function CompletedBills() {
             lines: printing.lineItems,
             subtotal: printing.subtotal,
             tax: printing.tax,
+            roundOff: printing.roundOff ?? 0,
             total: printing.total,
           }}
           billNumber={printing.billNumber}
@@ -226,7 +227,7 @@ function ByTable({ bills, canOpen, onPrint }: BillListProps) {
               <span className="text-lg font-bold">{tableCode}</span>
               <span className="text-ink-muted text-sm tabular-nums">
                 {tableBills.length} {tableBills.length === 1 ? 'bill' : 'bills'} ·{' '}
-                {formatCurrency(total)}
+                {formatBillTotal(total)}
               </span>
             </h3>
             <BillList bills={tableBills} canOpen={canOpen} onPrint={onPrint} />
@@ -361,7 +362,7 @@ function BillRow({
         <PaidStatus bill={bill} />
       </td>
       <td className="px-3 py-2.5 text-right font-bold tabular-nums">
-        {formatCurrency(bill.total)}
+        {formatBillTotal(bill.total)}
       </td>
       <td className="px-3 py-2.5 text-right">
         <PrintButton bill={bill} onPrint={() => onPrint(bill)} />
@@ -385,7 +386,7 @@ function BillCard({
     <>
       <div className="flex items-baseline justify-between gap-2">
         <span className="text-lg font-bold">{bill.tableCode}</span>
-        <span className="font-bold tabular-nums">{formatCurrency(bill.total)}</span>
+        <span className="font-bold tabular-nums">{formatBillTotal(bill.total)}</span>
       </div>
       <div className="text-ink-muted flex items-center justify-between gap-2 text-sm">
         <span className="tabular-nums">

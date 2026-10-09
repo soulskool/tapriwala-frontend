@@ -49,7 +49,8 @@ function bill(over: Partial<ConsolidatedBill> = {}): ConsolidatedBill {
     cancelledLines: [],
     subtotal: 50,
     tax: 2.5,
-    total: 52.5,
+    total: 53,
+    roundOff: 0.5,
     roundCount: 1,
     itemCount: 2,
     orderTypes: ['dining'],
@@ -133,12 +134,15 @@ describe('ReceiptSheet content', () => {
 
   it('prints the totals it was given', () => {
     const { container } = render(
-      <ReceiptSheet bill={bill({ subtotal: 100, tax: 5, total: 105 })} printedAt={printedAt} />,
+      <ReceiptSheet
+        bill={bill({ subtotal: 100, tax: 5, roundOff: 0, total: 105 })}
+        printedAt={printedAt}
+      />,
     );
     const text = container.textContent ?? '';
 
     expect(text).toContain('100.00');
-    expect(text).toContain('105.00');
+    expect(container.querySelector('.receipt-total')?.textContent).toBe('NET TOTAL105');
   });
 
   it('splits tax half to CGST and half to SGST', () => {
@@ -177,6 +181,39 @@ describe('ReceiptSheet content', () => {
 
     const rows = printedLines(container).filter((text) => /^(0|5)\.00\s/.test(text));
     expect(rows).toHaveLength(2);
+  });
+
+  it('prints the round off with its sign, so the paper adds up', () => {
+    // 50 + 2.50 = 52.50, paid as 53.
+    const up = render(<ReceiptSheet bill={bill()} printedAt={printedAt} />);
+    const upLine = printedLines(up.container).find((text) => text.startsWith('ROUND OFF'));
+    expect(upLine).toBe(`ROUND OFF${'+0.50'.padStart(PAPER_WIDTH - 9)}`);
+    // NET TOTAL in whole rupees — no ".00" on a rounded bill.
+    expect(up.container.querySelector('.receipt-total')?.textContent).toBe('NET TOTAL53');
+
+    // 169.05 rounds down to 169.
+    const down = render(
+      <ReceiptSheet
+        bill={bill({ subtotal: 161, tax: 8.05, roundOff: -0.05, total: 169 })}
+        printedAt={printedAt}
+      />,
+    );
+    const downLine = printedLines(down.container).find((text) => text.startsWith('ROUND OFF'));
+    expect(downLine?.endsWith('-0.05')).toBe(true);
+    expect(downLine).toHaveLength(PAPER_WIDTH);
+  });
+
+  it('prints no round off line on a bill that had none', () => {
+    // Every bill saved before rounding, reprinted from Billed.
+    const { container } = render(
+      <ReceiptSheet
+        bill={{ tableCode: 'M1', lines: [line()], subtotal: 50, tax: 2.5, total: 52.5 }}
+        printedAt={printedAt}
+      />,
+    );
+    expect(container.textContent).not.toContain('ROUND OFF');
+    // It was charged in paise, so the paise stay on the reprint.
+    expect(container.querySelector('.receipt-total')?.textContent).toBe('NET TOTAL52.50');
   });
 
   it('says so plainly when no bill number has been generated yet', () => {

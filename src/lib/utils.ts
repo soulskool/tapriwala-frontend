@@ -46,6 +46,17 @@ export function formatCurrency(amount: number): string {
   return currencyFormatter.format(Number.isFinite(amount) ? amount : 0);
 }
 
+/**
+ * ₹452 — the amount a guest pays.
+ *
+ * Bills are rounded to the whole rupee, so the paise on the final figure are
+ * always .00 and the owner asked for them gone. A bill saved before rounding
+ * began really was charged in paise, and keeps them: ₹451.50 stays ₹451.50.
+ */
+export function formatBillTotal(amount: number): string {
+  return Number.isInteger(amount) ? formatCurrencyShort(amount) : formatCurrency(amount);
+}
+
 /** ₹1,235 — for tiles and badges where the paise are noise. */
 export function formatCurrencyShort(amount: number): string {
   return `₹${Math.round(Number.isFinite(amount) ? amount : 0).toLocaleString('en-IN')}`;
