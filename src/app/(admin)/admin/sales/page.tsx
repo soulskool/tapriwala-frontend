@@ -4,7 +4,7 @@ import { SalesClient } from './sales-client';
 
 export const metadata: Metadata = { title: 'Sales' };
 
-/** Day-wise sales — what each day took, from paid bills. */
+/** Every sales report: day-wise, item-wise, multi price, category-wise and item by day/month. */
 export default function AdminSalesPage() {
   return <SalesClient />;
 }

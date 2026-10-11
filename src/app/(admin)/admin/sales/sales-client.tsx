@@ -2,56 +2,20 @@
 
 import { useState } from 'react';
 
-import { IconSales } from '@/components/ui/icons';
-import { EmptyState, ErrorState, LoadingBlock } from '@/components/ui/feedback';
-import type { DailySalesRow } from '@/lib/types';
-import { cn, formatBillTotal, formatCurrency } from '@/lib/utils';
-import { useDailySalesQuery } from '@/store/api/admin-api';
-import { apiErrorMessage } from '@/store/api/base-query';
-
-/**
- * Today in the café's calendar, `YYYY-MM-DD`.
- *
- * Asia/Kolkata, the same zone the backend books each bill's day in, so a phone
- * left on another timezone still asks for the right day. `en-CA` is used only
- * because it formats as ISO.
- */
-function cafeToday(): string {
-  return new Intl.DateTimeFormat('en-CA', {
-    timeZone: 'Asia/Kolkata',
-    year: 'numeric',
-    month: '2-digit',
-    day: '2-digit',
-  }).format(new Date());
-}
-
-/** Pure calendar arithmetic on a `YYYY-MM-DD`; UTC is only a counting device. */
-function shiftDay(day: string, by: number): string {
-  const date = new Date(`${day}T00:00:00.000Z`);
-  date.setUTCDate(date.getUTCDate() + by);
-  return date.toISOString().slice(0, 10);
-}
-
-/** "Wed, 08 Oct 2026" — the weekday is what an owner scans a month by. */
-function formatDay(day: string): string {
-  return new Intl.DateTimeFormat('en-IN', {
-    timeZone: 'UTC',
-    weekday: 'short',
-    day: '2-digit',
-    month: 'short',
-    year: 'numeric',
-  }).format(new Date(`${day}T00:00:00.000Z`));
-}
-
-/** +₹0.50 / −₹0.05 — a round off can go either way, so it always shows its sign. */
-function formatSigned(amount: number): string {
-  if (amount === 0) return formatCurrency(0);
-  return `${amount < 0 ? '−' : '+'}${formatCurrency(Math.abs(amount))}`;
-}
+import { DaySalesReport } from '@/components/sales/day-sales-report';
+import { ItemSalesReport, type ItemSalesView } from '@/components/sales/item-sales-report';
+import { SALES_PERIOD, type SalesPeriod } from '@/lib/constants';
+import { cafeToday, shiftDay } from '@/lib/sales-dates';
+import { cn } from '@/lib/utils';
 
 interface Range {
   from: string;
   to: string;
+}
+
+/** The last day of the month before `day`'s. */
+function endOfLastMonth(day: string): string {
+  return shiftDay(`${day.slice(0, 8)}01`, -1);
 }
 
 const PRESETS: { key: string; label: string; range: (today: string) => Range }[] = [
@@ -63,23 +27,63 @@ const PRESETS: { key: string; label: string; range: (today: string) => Range }[]
     label: 'This month',
     range: (today) => ({ from: `${today.slice(0, 8)}01`, to: today }),
   },
+  {
+    key: 'last-month',
+    label: 'Last month',
+    range: (today) => {
+      const to = endOfLastMonth(today);
+      return { from: `${to.slice(0, 8)}01`, to };
+    },
+  },
+  {
+    key: 'year',
+    label: 'This year',
+    range: (today) => ({ from: `${today.slice(0, 4)}-01-01`, to: today }),
+  },
 ];
 
+type SalesView = 'days' | ItemSalesView;
+
 /**
- * Day-wise sales — the owner's end-of-day screen.
- *
- * One row per café day: how many bills, what they came to before tax, the tax,
- * the round off and the total collected. **Paid bills only** — see
- * `dailySales` in the backend for why — so this is the figure that should be
- * in the drawer, and it matches the Excel export for the same days.
+ * Every sales question on one screen, the way the old POS laid them out:
+ * pick a range once, then flip between the views of it.
  */
+const VIEWS: { key: SalesView; label: string; hint: string }[] = [
+  {
+    key: 'days',
+    label: 'Day-wise',
+    hint: 'What each day took. Paid bills only, each rounded to the rupee.',
+  },
+  {
+    key: 'items',
+    label: 'Item wise',
+    hint: 'How much of each item sold, and what it brought in.',
+  },
+  {
+    key: 'prices',
+    label: 'Item wise (multi price)',
+    hint: 'Each item split by the price it sold at — dining and parcel separately.',
+  },
+  {
+    key: 'categories',
+    label: 'Category wise',
+    hint: 'Takings per menu category. Tap a category to see its items.',
+  },
+  {
+    key: 'trend',
+    label: 'Item by day / month',
+    hint: 'How many of each item sold on each day, or in each month.',
+  },
+];
+
 export function SalesClient() {
   const [today] = useState(cafeToday);
+  const [view, setView] = useState<SalesView>('days');
+  const [period, setPeriod] = useState<SalesPeriod>(SALES_PERIOD.DAY);
   const [preset, setPreset] = useState<string | null>('30');
   const [range, setRange] = useState<Range>(() => ({ from: shiftDay(today, -29), to: today }));
 
-  const sales = useDailySalesQuery(range);
-  const report = sales.data;
+  const current = VIEWS.find((item) => item.key === view) ?? VIEWS[0]!;
 
   function pick(key: string) {
     const match = PRESETS.find((item) => item.key === key);
@@ -92,18 +96,39 @@ export function SalesClient() {
     // A cleared date input sends '' — ignore it rather than ask for nonsense.
     if (!value) return;
     setPreset(null);
-    setRange((current) => ({ ...current, [edge]: value }));
+    setRange((existing) => ({ ...existing, [edge]: value }));
   }
 
   return (
     <div className="flex flex-col gap-4">
       <header className="flex flex-col gap-3">
         <div>
-          <h1 className="text-2xl font-bold">Day-wise sales</h1>
+          <h1 className="text-2xl font-bold">Sales</h1>
           <p className="text-ink-muted text-sm">
-            Paid bills only, each rounded to the rupee. A bill counts on the day it was generated.
+            {current.hint} A bill counts on the day it was generated.
           </p>
         </div>
+
+        <nav aria-label="Sales reports" className="-mx-4 overflow-x-auto px-4">
+          <div className="border-line flex min-w-max gap-1 border-b">
+            {VIEWS.map((item) => (
+              <button
+                key={item.key}
+                type="button"
+                onClick={() => setView(item.key)}
+                aria-current={view === item.key ? 'page' : undefined}
+                className={cn(
+                  'min-h-touch -mb-px border-b-2 px-3 text-sm font-semibold whitespace-nowrap transition',
+                  view === item.key
+                    ? 'border-brand-600 text-brand-700'
+                    : 'text-ink-muted hover:text-ink border-transparent',
+                )}
+              >
+                {item.label}
+              </button>
+            ))}
+          </div>
+        </nav>
 
         <div className="flex flex-wrap items-end gap-2">
           <div className="flex flex-wrap gap-1.5">
@@ -149,133 +174,11 @@ export function SalesClient() {
         </div>
       </header>
 
-      {sales.isLoading ? (
-        <LoadingBlock label="Adding up the days…" />
-      ) : sales.isError || !report ? (
-        <ErrorState
-          message={apiErrorMessage(sales.error, 'Could not load the sales')}
-          onRetry={() => void sales.refetch()}
-        />
+      {view === 'days' ? (
+        <DaySalesReport range={range} today={today} />
       ) : (
-        <>
-          <dl className="grid grid-cols-2 gap-3 lg:grid-cols-4">
-            <Stat label="Total sale" value={formatBillTotal(report.totals.total)} strong />
-            <Stat label="Bills" value={String(report.totals.bills)} />
-            <Stat label="Tax" value={formatCurrency(report.totals.tax)} />
-            <Stat label="Round off" value={formatSigned(report.totals.roundOff)} />
-          </dl>
-
-          {report.totals.bills === 0 ? (
-            <EmptyState
-              icon={<IconSales />}
-              title="No paid bills in this range"
-              description="Pick a different range above."
-            />
-          ) : (
-            // Scrolls inside its own box on a phone rather than pushing the
-            // whole page sideways.
-            <section
-              aria-label="Sales by day"
-              className={cn(
-                'rounded-card border-line bg-surface overflow-x-auto border',
-                sales.isFetching && 'opacity-60',
-              )}
-            >
-              <table className="w-full min-w-[40rem] text-left">
-                <thead className="border-line bg-surface-muted text-ink-muted border-b text-sm">
-                  <tr>
-                    <th scope="col" className="px-3 py-2 font-semibold">
-                      Date
-                    </th>
-                    <th scope="col" className="px-3 py-2 text-right font-semibold">
-                      Bills
-                    </th>
-                    <th scope="col" className="px-3 py-2 text-right font-semibold">
-                      Subtotal
-                    </th>
-                    <th scope="col" className="px-3 py-2 text-right font-semibold">
-                      Tax
-                    </th>
-                    <th scope="col" className="px-3 py-2 text-right font-semibold">
-                      Round off
-                    </th>
-                    <th scope="col" className="px-3 py-2 text-right font-semibold">
-                      Total sale
-                    </th>
-                  </tr>
-                </thead>
-                <tbody>
-                  {report.days.map((row) => (
-                    <DayRow key={row.date} row={row} isToday={row.date === today} />
-                  ))}
-                </tbody>
-                <tfoot className="border-line bg-surface-muted border-t-2 font-bold">
-                  <tr>
-                    <th scope="row" className="px-3 py-2.5">
-                      Total
-                    </th>
-                    <td className="px-3 py-2.5 text-right tabular-nums">{report.totals.bills}</td>
-                    <td className="px-3 py-2.5 text-right tabular-nums">
-                      {formatCurrency(report.totals.subtotal)}
-                    </td>
-                    <td className="px-3 py-2.5 text-right tabular-nums">
-                      {formatCurrency(report.totals.tax)}
-                    </td>
-                    <td className="px-3 py-2.5 text-right tabular-nums">
-                      {formatSigned(report.totals.roundOff)}
-                    </td>
-                    <td className="px-3 py-2.5 text-right text-lg tabular-nums">
-                      {formatBillTotal(report.totals.total)}
-                    </td>
-                  </tr>
-                </tfoot>
-              </table>
-            </section>
-          )}
-        </>
+        <ItemSalesReport range={range} view={view} period={period} onPeriodChange={setPeriod} />
       )}
-    </div>
-  );
-}
-
-function DayRow({ row, isToday }: { row: DailySalesRow; isToday: boolean }) {
-  // A day with no paid bills reads as a dash, the way the old POS showed it —
-  // a column of ₹0.00s hides the days that actually traded.
-  const empty = row.bills === 0;
-  const cell = 'px-3 py-2 text-right tabular-nums';
-
-  return (
-    <tr className={cn('border-line border-b last:border-b-0', isToday && 'bg-brand-50')}>
-      <th scope="row" className="px-3 py-2 font-medium whitespace-nowrap">
-        {formatDay(row.date)}
-        {isToday ? (
-          <span className="bg-brand-600 ml-2 rounded-full px-2 py-0.5 text-xs font-bold text-white">
-            Today
-          </span>
-        ) : null}
-      </th>
-      {empty ? (
-        <td colSpan={5} className="text-ink-muted px-3 py-2 text-right">
-          — no paid bills
-        </td>
-      ) : (
-        <>
-          <td className={cell}>{row.bills}</td>
-          <td className={cell}>{formatCurrency(row.subtotal)}</td>
-          <td className={cell}>{formatCurrency(row.tax)}</td>
-          <td className={cell}>{formatSigned(row.roundOff)}</td>
-          <td className={cn(cell, 'font-bold')}>{formatBillTotal(row.total)}</td>
-        </>
-      )}
-    </tr>
-  );
-}
-
-function Stat({ label, value, strong }: { label: string; value: string; strong?: boolean }) {
-  return (
-    <div className="rounded-card border-line bg-surface border px-4 py-3">
-      <dt className="text-ink-muted text-sm">{label}</dt>
-      <dd className={cn('font-bold tabular-nums', strong ? 'text-2xl' : 'text-xl')}>{value}</dd>
     </div>
   );
 }

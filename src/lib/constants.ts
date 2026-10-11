@@ -260,3 +260,11 @@ export const CART_LIMITS = {
   MAX_QUANTITY_PER_ITEM: 99,
   MAX_SPECIAL_INSTRUCTIONS_LENGTH: 300,
 } as const;
+
+/** Item-wise sales buckets. Mirrors SALES_PERIOD in the backend. */
+export const SALES_PERIOD = {
+  DAY: 'day',
+  MONTH: 'month',
+} as const;
+
+export type SalesPeriod = (typeof SALES_PERIOD)[keyof typeof SALES_PERIOD];

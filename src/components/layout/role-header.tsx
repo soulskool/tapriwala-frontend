@@ -57,7 +57,6 @@ const NAV_BY_ROLE: Record<string, NavItem[]> = {
   ],
   [ROLES.ADMIN]: [
     { href: '/admin', label: 'Overview', icon: IconOverview },
-    { href: '/admin/sales', label: 'Sales', icon: IconSales },
     { href: '/waiter', label: 'Floor', icon: IconFloor },
     { href: '/kitchen', label: 'Kitchen', icon: IconKitchen },
     { href: '/billing', label: 'Billing', icon: IconBill },
@@ -65,6 +64,7 @@ const NAV_BY_ROLE: Record<string, NavItem[]> = {
     { href: '/admin/products', label: 'Menu', icon: IconProducts },
     { href: '/admin/tables', label: 'Tables', icon: IconTables },
     { href: '/admin/users', label: 'Staff', icon: IconStaff },
+    { href: '/admin/sales', label: 'Sales', icon: IconSales },
     { href: '/admin/audit', label: 'Audit', icon: IconAudit },
   ],
 };

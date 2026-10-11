@@ -16,6 +16,7 @@ import type {
   OrderType,
   Role,
   RoundStatus,
+  SalesPeriod,
   ServiceRequestStatus,
   ServiceRequestType,
   SessionStatus,
@@ -435,6 +436,55 @@ export interface DailySalesReport {
   /** Newest first, every day in the range — a day with no bills reads zero. */
   days: DailySalesRow[];
   totals: Omit<DailySalesRow, 'date'>;
+}
+
+/** One price an item sold at — dining and parcel can be priced differently. */
+export interface ItemPriceRow {
+  unitPrice: number;
+  orderType: OrderType;
+  quantity: number;
+  amount: number;
+  tax: number;
+}
+
+export interface ItemSalesRow {
+  productCode: string;
+  /** POS name on the most recent bill. */
+  name: string;
+  /** Today's menu category; bills do not snapshot it. */
+  category: string;
+  quantity: number;
+  /** Before tax. */
+  amount: number;
+  tax: number;
+  /** amount + tax. Bill round off is not shared out across items. */
+  total: number;
+  prices: ItemPriceRow[];
+  /** Only the periods it sold in, keyed like `ItemSalesReport.periods`. */
+  byPeriod: Record<string, { quantity: number; amount: number }>;
+}
+
+export interface CategorySalesRow {
+  category: string;
+  itemCount: number;
+  quantity: number;
+  amount: number;
+  tax: number;
+  total: number;
+}
+
+export interface ItemSalesReport {
+  from: string;
+  to: string;
+  timezone: string;
+  period: SalesPeriod;
+  /** Every period in the range, oldest first — `YYYY-MM-DD` or `YYYY-MM`. */
+  periods: string[];
+  /** Highest takings first. */
+  items: ItemSalesRow[];
+  /** Highest takings first. */
+  categories: CategorySalesRow[];
+  totals: { bills: number; quantity: number; amount: number; tax: number; total: number };
 }
 
 export interface ExportResult {

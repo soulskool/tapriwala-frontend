@@ -1,10 +1,12 @@
 import { createApi } from '@reduxjs/toolkit/query/react';
 
-import type { Role } from '@/lib/constants';
+import { API_BASE_URL } from '@/lib/api-config';
+import type { Role, SalesPeriod } from '@/lib/constants';
 import type {
   AdminOverview,
   AuditEntry,
   DailySalesReport,
+  ItemSalesReport,
   Paginated,
   StaffUser,
 } from '@/lib/types';
@@ -84,8 +86,53 @@ export const adminApi = createApi({
       transformResponse: unwrap<DailySalesReport>,
       keepUnusedDataFor: 0,
     }),
+
+    /**
+     * Item-wise sales over the same paid bills: per item, per price, per
+     * category, and per day or month. One response feeds every item view on
+     * the Sales screen, so switching between them is instant.
+     */
+    itemSales: builder.query<ItemSalesReport, { from: string; to: string; period: SalesPeriod }>({
+      query: (params) => ({ url: '/admin/sales/items', params }),
+      transformResponse: unwrap<ItemSalesReport>,
+      keepUnusedDataFor: 60,
+    }),
   }),
 });
+
+/**
+ * The item-wise report as an Excel workbook — one sheet per view.
+ *
+ * Outside RTK Query for the same reason `downloadBillsXlsx` is: it is a file,
+ * and a blob has no business in the store.
+ */
+export async function downloadItemSalesXlsx(
+  params: { from: string; to: string; period: SalesPeriod },
+  filename: string,
+): Promise<void> {
+  const query = new URLSearchParams(params).toString();
+  const response = await fetch(`${API_BASE_URL}/admin/sales/items/xlsx?${query}`, {
+    credentials: 'include',
+  });
+
+  if (!response.ok) {
+    let message = 'Could not download the report';
+    try {
+      const body = (await response.json()) as { error?: { message?: string } };
+      if (body.error?.message) message = body.error.message;
+    } catch {
+      /* a non-JSON failure keeps the default message */
+    }
+    throw new Error(message);
+  }
+
+  const url = URL.createObjectURL(await response.blob());
+  const link = document.createElement('a');
+  link.href = url;
+  link.download = filename;
+  link.click();
+  URL.revokeObjectURL(url);
+}
 
 export const {
   useOverviewQuery,
@@ -94,4 +141,5 @@ export const {
   useUpdateUserMutation,
   useListAuditQuery,
   useDailySalesQuery,
+  useItemSalesQuery,
 } = adminApi;
