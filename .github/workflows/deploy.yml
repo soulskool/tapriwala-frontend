@@ -130,7 +130,10 @@ jobs:
             STAGE=build
             rm -rf "$BUILD_DIR.prev"
             [ -d "$BUILD_DIR" ] && cp -a "$BUILD_DIR" "$BUILD_DIR.prev"
-            npm run build
+            # Node's default ~2 GB heap is not enough for next build's type
+            # check (it died with "heap out of memory" on 2026-10-13). The VPS
+            # has ~8 GB; manual builds need the same: NODE_OPTIONS=... npm run build
+            NODE_OPTIONS=--max-old-space-size=4096 npm run build
 
             step "4/5 Restart $PM2_NAME"
             STAGE=restart

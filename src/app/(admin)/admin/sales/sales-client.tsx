@@ -62,7 +62,7 @@ const VIEWS: { key: SalesView; label: string; hint: string }[] = [
   {
     key: 'prices',
     label: 'Item wise (multi price)',
-    hint: 'Each item split by the price it sold at — dining and parcel separately.',
+    hint: 'Each item split by the price it sold at, dining and parcel separately.',
   },
   {
     key: 'categories',
