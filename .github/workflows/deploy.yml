@@ -1,0 +1,157 @@
+# Deploys `main` to the VPS on every push.
+#
+# It runs the same steps as the manual deploy (pull, install, build, pm2
+# restart), so the manual way still works whenever this does not:
+#
+#   cd /var/www/tapriwala/tapriwala-frontend
+#   git pull origin main && npm ci && npm run build && pm2 restart tapriwala-frontend
+#
+# If any step fails, the server is put back on the previous commit, its old
+# .next build and its old node_modules, and the run goes red. The step that
+# failed and the last pm2 log lines are printed in the run's log. Every run is
+# also appended to /var/log/tapriwala/deploy-frontend.log on the VPS.
+#
+# NEXT_PUBLIC_* values are baked in at build time from the .env on the VPS,
+# which is why the build runs there and not on GitHub.
+#
+# Secrets (Settings -> Secrets and variables -> Actions):
+#   VPS_HOST, VPS_USER, VPS_PORT, VPS_SSH_KEY
+
+name: Deploy frontend
+
+on:
+  push:
+    branches: [main]
+  # A "Run workflow" button on the Actions tab, to redeploy by hand.
+  workflow_dispatch:
+
+# A second push waits for the first deploy to finish rather than racing it.
+concurrency:
+  group: deploy-frontend
+  cancel-in-progress: false
+
+jobs:
+  deploy:
+    runs-on: ubuntu-latest
+    timeout-minutes: 30
+    steps:
+      - name: Deploy on the VPS
+        uses: appleboy/ssh-action@v1
+        with:
+          host: ${{ secrets.VPS_HOST }}
+          username: ${{ secrets.VPS_USER }}
+          port: ${{ secrets.VPS_PORT }}
+          key: ${{ secrets.VPS_SSH_KEY }}
+          command_timeout: 25m
+          script: |
+            bash -s <<'DEPLOY'
+            set -euo pipefail
+
+            APP_DIR=/var/www/tapriwala/tapriwala-frontend
+            PM2_NAME=tapriwala-frontend
+            BUILD_DIR=.next
+
+            # Every run is kept on the server as well as in GitHub.
+            mkdir -p /var/log/tapriwala
+            exec > >(tee -a /var/log/tapriwala/deploy-frontend.log) 2>&1
+
+            # A non-interactive SSH login does not load nvm; harmless without it.
+            export NVM_DIR="$HOME/.nvm"
+            [ -s "$NVM_DIR/nvm.sh" ] && . "$NVM_DIR/nvm.sh"
+
+            step() { echo; echo "=== [$(date '+%F %T')] $* ==="; }
+
+            # "<status> <restart count>" for the pm2 app, from pm2's JSON list.
+            pm2_state() {
+              pm2 jlist | node -e '
+                let s = "";
+                process.stdin.on("data", (d) => (s += d)).on("end", () => {
+                  const app = JSON.parse(s).find((a) => a.name === process.argv[1]);
+                  console.log(app ? `${app.pm2_env.status} ${app.pm2_env.restart_time}` : "missing 0");
+                });' "$PM2_NAME"
+            }
+
+            cd "$APP_DIR"
+
+            # One deploy at a time on this folder.
+            exec 9>/tmp/deploy-frontend.lock
+            flock -n 9 || { echo "!!! Another frontend deploy is running. Try again shortly."; exit 1; }
+
+            OLD=$(git rev-parse HEAD)
+            STAGE=fetch
+            REINSTALLED=no
+
+            rollback() {
+              local code=$?
+              [ "$code" -eq 0 ] && return
+              echo
+              echo "!!! DEPLOY FAILED during: $STAGE (exit code $code)"
+              echo "!!! Putting the server back on $(git log -1 --format='%h %s' "$OLD")"
+              git reset --hard "$OLD" || true
+              if [ -d "$BUILD_DIR.prev" ]; then rm -rf "$BUILD_DIR"; mv "$BUILD_DIR.prev" "$BUILD_DIR"; fi
+              if [ "$REINSTALLED" = yes ] && [ -d node_modules.prev ]; then
+                rm -rf node_modules; mv node_modules.prev node_modules
+              fi
+              # A failed build may have half-written .next, so restart onto the
+              # restored copy whenever the build had started.
+              if [ "$STAGE" = build ] || [ "$STAGE" = restart ] || [ "$STAGE" = health ]; then
+                pm2 restart "$PM2_NAME" --update-env || true
+              fi
+              echo "--- last 40 lines of pm2 logs for $PM2_NAME ---"
+              pm2 logs "$PM2_NAME" --lines 40 --nostream || true
+              exit "$code"
+            }
+            trap rollback EXIT
+
+            step "1/5 Fetch main from GitHub"
+            git fetch origin main
+            DIRTY=$(git status --short --untracked-files=no)
+            if [ -n "$DIRTY" ]; then
+              echo "These files were edited on the server and will be replaced by GitHub's copy:"
+              echo "$DIRTY"
+            fi
+            git reset --hard origin/main
+            echo "Was: $(git log -1 --format='%h %s' "$OLD")"
+            echo "Now: $(git log -1 --format='%h %s' HEAD)"
+
+            step "2/5 Install packages"
+            STAGE=install
+            if [ ! -d node_modules ] || ! git diff --quiet "$OLD" HEAD -- package-lock.json; then
+              echo "package-lock.json changed - running npm ci"
+              rm -rf node_modules.prev
+              [ -d node_modules ] && mv node_modules node_modules.prev
+              REINSTALLED=yes
+              npm ci
+            else
+              echo "package-lock.json unchanged - skipping npm ci"
+            fi
+
+            step "3/5 Build"
+            STAGE=build
+            rm -rf "$BUILD_DIR.prev"
+            [ -d "$BUILD_DIR" ] && cp -a "$BUILD_DIR" "$BUILD_DIR.prev"
+            npm run build
+
+            step "4/5 Restart $PM2_NAME"
+            STAGE=restart
+            pm2 restart "$PM2_NAME" --update-env
+
+            step "5/5 Health check"
+            STAGE=health
+            # Online now, and still online with no extra restarts 20s later -
+            # a crash loop shows up as a climbing restart count.
+            sleep 5
+            read -r STATUS_A RESTARTS_A <<< "$(pm2_state)"
+            sleep 20
+            read -r STATUS_B RESTARTS_B <<< "$(pm2_state)"
+            echo "pm2 status: $STATUS_B, restarts during check: $((RESTARTS_B - RESTARTS_A))"
+            if [ "$STATUS_A" != online ] || [ "$STATUS_B" != online ] || [ "$RESTARTS_A" != "$RESTARTS_B" ]; then
+              echo "!!! $PM2_NAME is not staying up after the restart"
+              exit 1
+            fi
+
+            rm -rf "$BUILD_DIR.prev" node_modules.prev
+            trap - EXIT
+            echo
+            echo "=== DEPLOYED $(git log -1 --format='%h %s') ==="
+            DEPLOY

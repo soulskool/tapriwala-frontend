@@ -16,11 +16,12 @@ import { defineConfig } from 'vitest/config';
  * No `@vitejs/plugin-react` on purpose. Next 16 installs rolldown-vite at the
  * top level while Vitest carries its own Vite, so a plugin typed against one
  * does not satisfy the other and `tsc --noEmit` fails on this file. Nothing
- * here needs the plugin: esbuild transforms the TSX from `jsx: react-jsx` in
+ * here needs the plugin: Oxc transforms the TSX from `jsx: react-jsx` in
  * tsconfig, and Fast Refresh is meaningless in a test run.
  */
 export default defineConfig({
-  esbuild: { jsx: 'automatic' },
+  // Vite 8 (Vitest 4) transforms with Oxc, not esbuild.
+  oxc: { jsx: { runtime: 'automatic' } },
   resolve: {
     alias: {
       '@': fileURLToPath(new URL('./src', import.meta.url)),
