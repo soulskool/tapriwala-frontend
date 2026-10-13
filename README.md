@@ -50,13 +50,13 @@ and `CUSTOMER_BASE_URL` must point here so printed QR codes resolve.
 
 ## The four screens
 
-| Route                                            | Who                                    | Auth                                    |
-| ------------------------------------------------ | -------------------------------------- | --------------------------------------- |
-| `/order/<qrToken>`                               | guest, from the sticker on their table | none — the QR token _is_ the credential |
-| `/waiter`, `/waiter/<tableId>`                   | waiter (+ billing)                     | PIN                                     |
-| `/kitchen`                                       | kitchen                                | PIN                                     |
-| `/billing`, `/billing/<sessionId>`               | billing                                | PIN                                     |
-| `/admin`, `/admin/{products,tables,users,audit}` | admin                                  | PIN                                     |
+| Route                                                  | Who                                    | Auth                                    |
+| ------------------------------------------------------ | -------------------------------------- | --------------------------------------- |
+| `/order/<qrToken>`                                     | guest, from the sticker on their table | none — the QR token _is_ the credential |
+| `/waiter`, `/waiter/<tableId>`                         | waiter (+ billing)                     | PIN                                     |
+| `/kitchen`                                             | kitchen                                | PIN                                     |
+| `/billing`, `/billing/<sessionId>`                     | billing                                | PIN                                     |
+| `/admin`, `/admin/{products,tables,users,sales,audit}` | admin                                  | PIN                                     |
 
 `/login` is the PIN pad. `/` sends a signed-in operator to their own screen.
 
@@ -91,7 +91,7 @@ src/
     (waiter)/waiter/              floor grid, per-table ordering
     (kitchen)/kitchen/            the KDS board (dark, full-bleed)
     (billing)/billing/            queue + consolidation
-    (admin)/admin/                overview, products, tables, users, audit
+    (admin)/admin/                overview, products, tables, users, sales, audit
     login/                        PIN pad
     providers.tsx                 store, auth restore, toasts
     globals.css                   Tailwind v4 @theme design tokens
@@ -179,6 +179,27 @@ veranda Wi-Fi does not lose their basket.
 - `next/image` for every menu photo.
 - The customer's menu is rendered on the **server**, so a guest sees the menu
   before any JS boots.
+
+---
+
+## Deploy
+
+**Pushing `main` deploys automatically.** `.github/workflows/deploy.yml` SSHes
+into the VPS and, in `/var/www/tapriwala/tapriwala-frontend`, runs fetch + reset
+to `origin/main`, `npm ci` (only when `package-lock.json` changed),
+`npm run build`, `pm2 restart tapriwala-frontend` (`next start -p 3011`), then
+checks PM2 keeps it online with no extra restarts for 20s. Any failure restores
+the previous commit, `.next` and `node_modules`; the run goes red with the
+failing step. Log on the VPS: `/var/log/tapriwala/deploy-frontend.log`. The
+whole flow, its rules and the daily dev → main routine are in `../CLAUDE.md`
+under "Production and deploys".
+
+The build runs **on the VPS**, not on GitHub, because `NEXT_PUBLIC_*` values
+come from the VPS `.env` at build time. Manual fallback:
+
+```bash
+git pull origin main && npm ci && npm run build && pm2 restart tapriwala-frontend
+```
 
 ---
 

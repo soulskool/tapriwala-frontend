@@ -40,3 +40,11 @@ npm run check     # typecheck + lint + format:check
   round. Clearing it earlier breaks double-tap protection.
 - The KDS splits, billing merges. Do not "fix" one to match the other.
 - No `any`. Shared shapes live in `src/lib/types.ts`.
+- `tsconfig.json` includes `**/*.ts` and excludes only `node_modules` and
+  `tests`. Any other folder of `.ts` files inside this directory — a
+  `node_modules.prev` backup, a copied checkout — is type-checked by
+  `next build`. On 2026-10-13 that ran the VPS build out of memory and then
+  failed it with thousands of errors from a second copy of zod. The deploy keeps
+  its backups in `/var/www/tapriwala/.deploy-backup/`; keep it that way.
+- A push to `main` is a production deploy (`.github/workflows/deploy.yml`). See
+  "Production and deploys" in `../CLAUDE.md`.
