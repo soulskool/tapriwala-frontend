@@ -8,6 +8,7 @@ import { Button } from '@/components/ui/button';
 import { SelectField, TextAreaField, TextField } from '@/components/ui/field';
 import { EmptyState, ErrorState, LoadingBlock } from '@/components/ui/feedback';
 import { Modal } from '@/components/ui/modal';
+import { useCanWrite } from '@/hooks/use-can-write';
 import { useDebouncedValue } from '@/hooks/use-debounce';
 import { KITCHEN_STATIONS, KITCHEN_STATION_VALUES } from '@/lib/constants';
 import type { Product } from '@/lib/types';
@@ -78,6 +79,9 @@ export function ProductsClient() {
   const [setAvailability] = useSetAvailabilityMutation();
   const [uploadImage, { isLoading: isUploading }] = useUploadProductImageMutation();
   const [deleteImage] = useDeleteProductImageMutation();
+  // A view-only admin reads the whole menu and changes none of it: no add,
+  // no edit, no photo, and the 86 toggle renders as a plain label.
+  const canEdit = useCanWrite();
 
   const [editing, setEditing] = useState<Draft | null>(null);
   const [formError, setFormError] = useState<unknown>(null);
@@ -153,7 +157,9 @@ export function ProductsClient() {
           className="min-h-touch border-line bg-surface min-w-56 flex-1 rounded-xl border px-4"
         />
 
-        <Button onClick={() => setEditing({ ...EMPTY_DRAFT })}>+ Add item</Button>
+        {canEdit ? (
+          <Button onClick={() => setEditing({ ...EMPTY_DRAFT })}>+ Add item</Button>
+        ) : null}
       </header>
 
       {visible.length === 0 ? (
@@ -201,27 +207,41 @@ export function ProductsClient() {
                   className={cn('border-line border-b', !product.isActive && 'opacity-50')}
                 >
                   <td className="px-3 py-2">
-                    <button
-                      type="button"
-                      onClick={() => {
-                        setImageTargetId(product.id);
-                        fileInputRef.current?.click();
-                      }}
-                      title="Upload a photo"
-                      className="border-line bg-surface-sunken block size-12 overflow-hidden rounded-lg border"
-                    >
-                      {product.imageUrl ? (
-                        <Image
-                          src={product.imageUrl}
-                          alt=""
-                          width={48}
-                          height={48}
-                          className="size-12 object-cover"
-                        />
-                      ) : (
-                        <span className="text-lg">＋</span>
-                      )}
-                    </button>
+                    {canEdit ? (
+                      <button
+                        type="button"
+                        onClick={() => {
+                          setImageTargetId(product.id);
+                          fileInputRef.current?.click();
+                        }}
+                        title="Upload a photo"
+                        className="border-line bg-surface-sunken block size-12 overflow-hidden rounded-lg border"
+                      >
+                        {product.imageUrl ? (
+                          <Image
+                            src={product.imageUrl}
+                            alt=""
+                            width={48}
+                            height={48}
+                            className="size-12 object-cover"
+                          />
+                        ) : (
+                          <span className="text-lg">＋</span>
+                        )}
+                      </button>
+                    ) : (
+                      <span className="border-line bg-surface-sunken block size-12 overflow-hidden rounded-lg border">
+                        {product.imageUrl ? (
+                          <Image
+                            src={product.imageUrl}
+                            alt=""
+                            width={48}
+                            height={48}
+                            className="size-12 object-cover"
+                          />
+                        ) : null}
+                      </span>
+                    )}
                   </td>
 
                   <td className="px-3 py-2">
@@ -242,27 +262,40 @@ export function ProductsClient() {
                   <td className="px-3 py-2 text-sm">{product.kitchenStation}</td>
 
                   <td className="px-3 py-2">
-                    <button
-                      type="button"
-                      onClick={() =>
-                        void setAvailability({
-                          id: product.id,
-                          isAvailable: !product.isAvailable,
-                        })
-                      }
-                      className={cn(
-                        'min-h-9 rounded-full px-3 text-sm font-semibold',
-                        product.isAvailable
-                          ? 'bg-status-ready-soft text-status-ready-ink'
-                          : 'bg-status-cancelled-soft text-status-cancelled-ink',
-                      )}
-                    >
-                      {product.isAvailable ? 'On menu' : "86'd"}
-                    </button>
+                    {canEdit ? (
+                      <button
+                        type="button"
+                        onClick={() =>
+                          void setAvailability({
+                            id: product.id,
+                            isAvailable: !product.isAvailable,
+                          })
+                        }
+                        className={cn(
+                          'min-h-9 rounded-full px-3 text-sm font-semibold',
+                          product.isAvailable
+                            ? 'bg-status-ready-soft text-status-ready-ink'
+                            : 'bg-status-cancelled-soft text-status-cancelled-ink',
+                        )}
+                      >
+                        {product.isAvailable ? 'On menu' : "86'd"}
+                      </button>
+                    ) : (
+                      <span
+                        className={cn(
+                          'inline-flex min-h-9 items-center rounded-full px-3 text-sm font-semibold',
+                          product.isAvailable
+                            ? 'bg-status-ready-soft text-status-ready-ink'
+                            : 'bg-status-cancelled-soft text-status-cancelled-ink',
+                        )}
+                      >
+                        {product.isAvailable ? 'On menu' : "86'd"}
+                      </span>
+                    )}
                   </td>
 
                   <td className="px-3 py-2 text-right">
-                    <div className="flex justify-end gap-1.5">
+                    <div className={cn('flex justify-end gap-1.5', !canEdit && 'hidden')}>
                       <button
                         type="button"
                         onClick={() => setEditing(product)}

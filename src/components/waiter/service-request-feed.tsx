@@ -10,8 +10,9 @@ import { SERVICE_REQUEST_LABEL, cn, formatElapsed } from '@/lib/utils';
 
 interface ServiceRequestFeedProps {
   requests: ServiceRequest[];
-  onAcknowledge: (id: string) => void;
-  onResolve: (id: string) => void;
+  /** "On it" / "Done". Omitted for a view-only admin, and so are the buttons. */
+  onAcknowledge?: (id: string) => void;
+  onResolve?: (id: string) => void;
   busyId?: string | null;
 }
 
@@ -84,7 +85,7 @@ export function ServiceRequestFeed({
             </div>
 
             <div className="flex shrink-0 gap-1.5">
-              {!acknowledged ? (
+              {!acknowledged && onAcknowledge ? (
                 <button
                   type="button"
                   disabled={busyId === id}
@@ -94,14 +95,16 @@ export function ServiceRequestFeed({
                   On it
                 </button>
               ) : null}
-              <button
-                type="button"
-                disabled={busyId === id}
-                onClick={() => onResolve(id)}
-                className="min-h-touch bg-status-ready rounded-xl px-3 text-sm font-semibold text-white hover:brightness-95 disabled:opacity-50"
-              >
-                Done
-              </button>
+              {onResolve ? (
+                <button
+                  type="button"
+                  disabled={busyId === id}
+                  onClick={() => onResolve(id)}
+                  className="min-h-touch bg-status-ready rounded-xl px-3 text-sm font-semibold text-white hover:brightness-95 disabled:opacity-50"
+                >
+                  Done
+                </button>
+              ) : null}
             </div>
           </li>
         );

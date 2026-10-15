@@ -4,6 +4,7 @@ import { useMemo, useState } from 'react';
 
 import { TableGrid } from '@/components/table/table-grid';
 import { ErrorState, LoadingBlock } from '@/components/ui/feedback';
+import { useCanWrite } from '@/hooks/use-can-write';
 import { ReadyToServeFeed } from '@/components/waiter/ready-to-serve-feed';
 import { ServiceRequestFeed } from '@/components/waiter/service-request-feed';
 import { ITEM_STATUS, SERVICE_REQUEST_STATUS } from '@/lib/constants';
@@ -38,6 +39,8 @@ export function FloorClient() {
 
   const [updateRequest] = useUpdateRequestMutation();
   const [updateRoundStatus] = useUpdateRoundStatusMutation();
+  // A view-only admin sees both lists; the buttons on them are the floor's.
+  const canAct = useCanWrite();
 
   const [busyRequestId, setBusyRequestId] = useState<string | null>(null);
   const [busyRoundId, setBusyRoundId] = useState<string | null>(null);
@@ -139,16 +142,22 @@ export function FloorClient() {
           <ServiceRequestFeed
             requests={openRequests}
             busyId={busyRequestId}
-            onAcknowledge={(id) =>
-              void handleRequestUpdate(id, SERVICE_REQUEST_STATUS.ACKNOWLEDGED)
+            onAcknowledge={
+              canAct
+                ? (id) => void handleRequestUpdate(id, SERVICE_REQUEST_STATUS.ACKNOWLEDGED)
+                : undefined
             }
-            onResolve={(id) => void handleRequestUpdate(id, SERVICE_REQUEST_STATUS.RESOLVED)}
+            onResolve={
+              canAct
+                ? (id) => void handleRequestUpdate(id, SERVICE_REQUEST_STATUS.RESOLVED)
+                : undefined
+            }
           />
         ) : (
           <ReadyToServeFeed
             rounds={readyRounds}
             busyRoundId={busyRoundId}
-            onServe={(round) => void handleServe(round)}
+            onServe={canAct ? (round) => void handleServe(round) : undefined}
           />
         )}
       </aside>

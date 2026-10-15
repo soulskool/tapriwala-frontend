@@ -42,6 +42,9 @@ const PRESETS: { key: string; label: string; range: (today: string) => Range }[]
   },
 ];
 
+/** What the Sales tab shows when it is opened. */
+const DEFAULT_PRESET = PRESETS[0]!;
+
 type SalesView = 'days' | ItemSalesView;
 
 /**
@@ -80,8 +83,11 @@ export function SalesClient() {
   const [today] = useState(cafeToday);
   const [view, setView] = useState<SalesView>('days');
   const [period, setPeriod] = useState<SalesPeriod>(SALES_PERIOD.DAY);
-  const [preset, setPreset] = useState<string | null>('30');
-  const [range, setRange] = useState<Range>(() => ({ from: shiftDay(today, -29), to: today }));
+  // Opens on today: the owner's first question is "how is today going?".
+  // The range is read off the preset itself, so the highlighted button and
+  // the dates shown can never disagree.
+  const [preset, setPreset] = useState<string | null>(DEFAULT_PRESET.key);
+  const [range, setRange] = useState<Range>(() => DEFAULT_PRESET.range(today));
 
   const current = VIEWS.find((item) => item.key === view) ?? VIEWS[0]!;
 

@@ -1,7 +1,7 @@
 import { createSlice, type PayloadAction } from '@reduxjs/toolkit';
 
 import { clearCachedUser, readCachedUser, writeCachedUser } from '@/lib/api-config';
-import type { Role } from '@/lib/constants';
+import { OVERSIGHT_ROLES, READ_ONLY_ROLES, STAFF_MANAGER_ROLES, type Role } from '@/lib/constants';
 import type { AuthUser } from '@/lib/types';
 
 /**
@@ -67,10 +67,39 @@ const authSlice = createSlice({
   },
 });
 
-/** Admin sees every screen; everyone else sees their own. */
+/**
+ * Every admin role sees every screen; everyone else sees their own.
+ *
+ * Seeing is all this answers. A view-only admin passes here and is stopped
+ * from acting by `canWrite`, the same split the backend makes between
+ * `authorize` (reads pass) and `authenticate` (writes refused).
+ */
 export function canAccess(user: AuthUser | null, allowed: Role[]): boolean {
   if (!user) return false;
-  return user.role === 'admin' || allowed.includes(user.role);
+  return OVERSIGHT_ROLES.includes(user.role) || allowed.includes(user.role);
+}
+
+/**
+ * May this operator change anything at all?
+ *
+ * False only for the view-only admin. Every create, edit, status tap, 86
+ * toggle, bill and close button checks this and hides itself, because the
+ * backend refuses the write anyway and a button that always fails is worse
+ * than no button. This is a courtesy, not the security boundary.
+ */
+export function canWrite(user: AuthUser | null): boolean {
+  if (!user) return false;
+  return !READ_ONLY_ROLES.includes(user.role);
+}
+
+/**
+ * May this operator create or edit staff accounts? Super admin only — a plain
+ * admin reads the Staff page. Mirrors `requireRole` on the backend's
+ * `/admin/users` writes, which has no admin bypass.
+ */
+export function canManageStaff(user: AuthUser | null): boolean {
+  if (!user) return false;
+  return STAFF_MANAGER_ROLES.includes(user.role);
 }
 
 export const { signedIn, cachedUserRestored, profileConfirmed, signedOut } = authSlice.actions;

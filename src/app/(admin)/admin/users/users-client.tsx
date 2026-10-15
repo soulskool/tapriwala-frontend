@@ -6,7 +6,7 @@ import { Button } from '@/components/ui/button';
 import { SelectField, TextField } from '@/components/ui/field';
 import { ErrorState, LoadingBlock } from '@/components/ui/feedback';
 import { Modal } from '@/components/ui/modal';
-import { ROLES, ROLE_VALUES, type Role } from '@/lib/constants';
+import { ROLES, ROLE_LABEL, ROLE_VALUES, UNDEACTIVATABLE_ROLES, type Role } from '@/lib/constants';
 import type { StaffUser } from '@/lib/types';
 import { cn, formatDateTime, initials } from '@/lib/utils';
 import {
@@ -15,7 +15,8 @@ import {
   useUpdateUserMutation,
 } from '@/store/api/admin-api';
 import { apiErrorMessage, apiFieldErrors } from '@/store/api/base-query';
-import { useAppDispatch } from '@/store/hooks';
+import { useAppDispatch, useAppSelector } from '@/store/hooks';
+import { canManageStaff } from '@/store/slices/auth-slice';
 import { toastPushed } from '@/store/slices/ui-slice';
 
 interface Draft {
@@ -35,9 +36,14 @@ const EMPTY_DRAFT: Draft = { name: '', phone: '', role: ROLES.WAITER, pin: '' };
  * Devices are shared, so an account is really "who is on this device right
  * now". Deactivating is preferred over deleting: the audit trail references
  * these users, and a name that vanishes makes an old dispute unreadable.
+ *
+ * Every admin role reads this page; only a super admin edits it — including
+ * making another admin a super admin, or taking that back. The API enforces
+ * the same rule (`requireRole` on `/admin/users` writes).
  */
 export function UsersClient() {
   const dispatch = useAppDispatch();
+  const canManage = canManageStaff(useAppSelector((state) => state.auth.user));
 
   const users = useListUsersQuery({ includeInactive: true });
   const [createUser, { isLoading: isCreating }] = useCreateUserMutation();
@@ -98,12 +104,24 @@ export function UsersClient() {
         <h1 className="text-2xl font-bold">Staff</h1>
         <span className="text-ink-muted text-sm tabular-nums">{rows.length}</span>
         <div className="flex-1" />
-        <Button onClick={() => setEditing({ ...EMPTY_DRAFT })}>+ Add person</Button>
+        {canManage ? (
+          <Button onClick={() => setEditing({ ...EMPTY_DRAFT })}>+ Add person</Button>
+        ) : null}
       </header>
+
+      {!canManage ? (
+        <p className="rounded-card border-line bg-surface text-ink-muted border px-4 py-2.5 text-sm">
+          Only a super admin can add staff or change their details, PINs and roles.
+        </p>
+      ) : null}
 
       <ul className="grid gap-2.5 sm:grid-cols-2 xl:grid-cols-3">
         {rows.map((user) => (
-          <UserCard key={user.id} user={user} onEdit={() => setEditing(toDraft(user))} />
+          <UserCard
+            key={user.id}
+            user={user}
+            onEdit={canManage ? () => setEditing(toDraft(user)) : undefined}
+          />
         ))}
       </ul>
 
@@ -146,7 +164,14 @@ export function UsersClient() {
               label="Role"
               value={editing.role}
               onChange={(event) => setEditing({ ...editing, role: event.target.value as Role })}
-              options={ROLE_VALUES.map((role) => ({ value: role, label: role }))}
+              options={ROLE_VALUES.map((role) => ({ value: role, label: ROLE_LABEL[role] }))}
+              hint={
+                editing.role === ROLES.SUPER_ADMIN
+                  ? 'Can add and edit staff, including other super admins.'
+                  : editing.role === ROLES.ADMIN_VIEWER
+                    ? 'Sees every screen and report, cannot change anything.'
+                    : undefined
+              }
             />
             <TextField
               label={editing.id ? 'New PIN (leave blank to keep)' : 'PIN'}
@@ -162,10 +187,14 @@ export function UsersClient() {
               error={fieldErrors.pin}
             />
 
-            {editing.id && editing.role === ROLES.ADMIN ? (
-              // The API refuses to deactivate an admin — only an admin can
-              // reactivate anyone, so switching one off locks the shop out.
-              <p className="text-ink-muted text-sm">Admin accounts are always active.</p>
+            {editing.id && UNDEACTIVATABLE_ROLES.includes(editing.role) ? (
+              // The API refuses to deactivate an admin or super admin — staff
+              // management sits behind those roles, so switching one off is
+              // how the shop locks itself out. Change the role first.
+              <p className="text-ink-muted text-sm">
+                {ROLE_LABEL[editing.role]} accounts are always active. Change the role first to
+                switch one off.
+              </p>
             ) : editing.id ? (
               <label className="flex items-center gap-2 text-sm">
                 <input
@@ -206,9 +235,12 @@ const ROLE_STYLE: Record<Role, string> = {
   [ROLES.KITCHEN]: 'bg-status-preparing-soft text-status-preparing-ink',
   [ROLES.BILLING]: 'bg-status-bill-soft text-status-bill-ink',
   [ROLES.ADMIN]: 'bg-brand-100 text-brand-800',
+  [ROLES.SUPER_ADMIN]: 'bg-brand-600 text-white',
+  [ROLES.ADMIN_VIEWER]: 'bg-surface-sunken text-ink-muted',
 };
 
-function UserCard({ user, onEdit }: { user: StaffUser; onEdit: () => void }) {
+/** `onEdit` is absent for anyone who may not edit staff, and so is the button. */
+function UserCard({ user, onEdit }: { user: StaffUser; onEdit?: () => void }) {
   return (
     <li
       className={cn(
@@ -230,15 +262,17 @@ function UserCard({ user, onEdit }: { user: StaffUser; onEdit: () => void }) {
 
       <div className="flex shrink-0 flex-col items-end gap-1.5">
         <span className={cn('rounded-full px-2.5 py-0.5 text-xs font-bold', ROLE_STYLE[user.role])}>
-          {user.role}
+          {ROLE_LABEL[user.role] ?? user.role}
         </span>
-        <button
-          type="button"
-          onClick={onEdit}
-          className="border-line hover:bg-surface-sunken min-h-9 rounded-lg border px-2.5 text-sm"
-        >
-          Edit
-        </button>
+        {onEdit ? (
+          <button
+            type="button"
+            onClick={onEdit}
+            className="border-line hover:bg-surface-sunken min-h-9 rounded-lg border px-2.5 text-sm"
+          >
+            Edit
+          </button>
+        ) : null}
       </div>
     </li>
   );

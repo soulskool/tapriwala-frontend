@@ -9,8 +9,12 @@ import { cn, formatClockWithDay, formatCurrency, formatElapsed } from '@/lib/uti
 
 interface SessionRoundsProps {
   rounds: OrderRound[];
-  onItemStatus: (round: OrderRound, item: OrderItem, status: ItemStatus) => void;
-  onCancelItem: (round: OrderRound, item: OrderItem) => void;
+  /**
+   * The Served and Cancel buttons. Omitted for a view-only admin, and so are
+   * the buttons — the rounds still read in full.
+   */
+  onItemStatus?: (round: OrderRound, item: OrderItem, status: ItemStatus) => void;
+  onCancelItem?: (round: OrderRound, item: OrderItem) => void;
   busyItemId?: string | null;
   /**
    * Shows a Print KOT button on every round when given. Optional because the
@@ -81,8 +85,10 @@ export function SessionRounds({
                 key={item._id}
                 item={item}
                 busy={busyItemId === item._id}
-                onServe={() => onItemStatus(round, item, ITEM_STATUS.SERVED)}
-                onCancel={() => onCancelItem(round, item)}
+                onServe={
+                  onItemStatus ? () => onItemStatus(round, item, ITEM_STATUS.SERVED) : undefined
+                }
+                onCancel={onCancelItem ? () => onCancelItem(round, item) : undefined}
               />
             ))}
           </ul>
@@ -102,8 +108,8 @@ export function SessionRounds({
 interface ItemRowProps {
   item: OrderItem;
   busy: boolean;
-  onServe: () => void;
-  onCancel: () => void;
+  onServe?: () => void;
+  onCancel?: () => void;
 }
 
 function ItemRow({ item, busy, onServe, onCancel }: ItemRowProps) {
@@ -129,7 +135,7 @@ function ItemRow({ item, busy, onServe, onCancel }: ItemRowProps) {
       <StatusPill status={item.status} />
 
       <div className="flex shrink-0 gap-1.5">
-        {item.status === ITEM_STATUS.READY ? (
+        {item.status === ITEM_STATUS.READY && onServe ? (
           <button
             type="button"
             disabled={busy}
@@ -140,7 +146,7 @@ function ItemRow({ item, busy, onServe, onCancel }: ItemRowProps) {
           </button>
         ) : null}
 
-        {!cancelled && !served ? (
+        {!cancelled && !served && onCancel ? (
           <button
             type="button"
             disabled={busy}

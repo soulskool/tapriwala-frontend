@@ -10,7 +10,8 @@ import { cn, formatElapsed } from '@/lib/utils';
 
 interface ReadyToServeFeedProps {
   rounds: OrderRound[];
-  onServe: (round: OrderRound) => void;
+  /** "Served". Omitted for a view-only admin, and so is the button. */
+  onServe?: (round: OrderRound) => void;
   busyRoundId?: string | null;
 }
 
@@ -60,14 +61,16 @@ export function ReadyToServeFeed({ rounds, onServe, busyRoundId }: ReadyToServeF
               </p>
             </div>
 
-            <button
-              type="button"
-              disabled={busyRoundId === round._id}
-              onClick={() => onServe(round)}
-              className="min-h-touch bg-status-served shrink-0 rounded-xl px-4 text-sm font-semibold text-white hover:brightness-95 disabled:opacity-50"
-            >
-              Served
-            </button>
+            {onServe ? (
+              <button
+                type="button"
+                disabled={busyRoundId === round._id}
+                onClick={() => onServe(round)}
+                className="min-h-touch bg-status-served shrink-0 rounded-xl px-4 text-sm font-semibold text-white hover:brightness-95 disabled:opacity-50"
+              >
+                Served
+              </button>
+            ) : null}
           </li>
         );
       })}

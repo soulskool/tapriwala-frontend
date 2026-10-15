@@ -7,6 +7,7 @@ import { Button } from '@/components/ui/button';
 import { SelectField, TextField } from '@/components/ui/field';
 import { ErrorState, LoadingBlock } from '@/components/ui/feedback';
 import { Modal } from '@/components/ui/modal';
+import { useCanWrite } from '@/hooks/use-can-write';
 import { TABLE_ZONES, TABLE_ZONE_VALUES } from '@/lib/constants';
 import type { TableMaster } from '@/lib/types';
 import { cn } from '@/lib/utils';
@@ -39,6 +40,7 @@ const EMPTY_DRAFT: Draft = {
  */
 export function TablesClient() {
   const dispatch = useAppDispatch();
+  const canEdit = useCanWrite();
 
   const tables = useListTablesQuery({ includeInactive: true });
   const qrSheet = useQrSheetQuery();
@@ -90,7 +92,10 @@ export function TablesClient() {
         <Button variant="secondary" onClick={() => setSheetOpen(true)}>
           <IconPrint aria-hidden className="mr-1.5 inline size-4" /> QR sheet
         </Button>
-        <Button onClick={() => setEditing({ ...EMPTY_DRAFT })}>+ Add table</Button>
+        {/* The QR sheet is a read, so a view-only admin keeps it. */}
+        {canEdit ? (
+          <Button onClick={() => setEditing({ ...EMPTY_DRAFT })}>+ Add table</Button>
+        ) : null}
       </header>
 
       <div className="rounded-card border-line bg-surface overflow-x-auto border">
@@ -138,7 +143,7 @@ export function TablesClient() {
                   </span>
                 </td>
                 <td className="px-3 py-2.5">
-                  <div className="flex justify-end gap-1.5">
+                  <div className={cn('flex justify-end gap-1.5', !canEdit && 'hidden')}>
                     <button
                       type="button"
                       onClick={() => setEditing(table)}

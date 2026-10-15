@@ -4,6 +4,8 @@ import { ROLES } from '@/lib/constants';
 import type { AuthUser } from '@/lib/types';
 import reducer, {
   canAccess,
+  canManageStaff,
+  canWrite,
   cachedUserRestored,
   profileConfirmed,
   signedIn,
@@ -40,6 +42,52 @@ describe('canAccess', () => {
   it('gives admin a bypass everywhere, matching the backend authorize()', () => {
     expect(canAccess(user(ROLES.ADMIN), [ROLES.BILLING])).toBe(true);
     expect(canAccess(user(ROLES.ADMIN), [])).toBe(true);
+  });
+
+  it('gives super admin and the view-only admin every screen too', () => {
+    // Seeing is shared by all three admin roles; acting is not (below).
+    for (const role of [ROLES.SUPER_ADMIN, ROLES.ADMIN_VIEWER]) {
+      expect(canAccess(user(role), [ROLES.BILLING])).toBe(true);
+      expect(canAccess(user(role), [ROLES.KITCHEN, ROLES.WAITER])).toBe(true);
+      expect(canAccess(user(role), [])).toBe(true);
+    }
+  });
+});
+
+describe('canWrite', () => {
+  it('refuses a signed-out visitor', () => {
+    expect(canWrite(null)).toBe(false);
+  });
+
+  it('refuses only the view-only admin', () => {
+    // Getting this backwards hides every button from the whole floor, or
+    // hands the view-only account a screen full of buttons that all 403.
+    expect(canWrite(user(ROLES.ADMIN_VIEWER))).toBe(false);
+    for (const role of [
+      ROLES.WAITER,
+      ROLES.KITCHEN,
+      ROLES.BILLING,
+      ROLES.ADMIN,
+      ROLES.SUPER_ADMIN,
+    ]) {
+      expect(canWrite(user(role)), role).toBe(true);
+    }
+  });
+});
+
+describe('canManageStaff', () => {
+  it('is super admin only — no admin bypass, matching requireRole() on the API', () => {
+    expect(canManageStaff(user(ROLES.SUPER_ADMIN))).toBe(true);
+    for (const role of [
+      ROLES.ADMIN,
+      ROLES.ADMIN_VIEWER,
+      ROLES.WAITER,
+      ROLES.KITCHEN,
+      ROLES.BILLING,
+    ]) {
+      expect(canManageStaff(user(role)), role).toBe(false);
+    }
+    expect(canManageStaff(null)).toBe(false);
   });
 });
 

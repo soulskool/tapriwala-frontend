@@ -1,12 +1,18 @@
 import { describe, expect, it } from 'vitest';
 
 import {
+  FULL_ACCESS_ROLES,
   ITEM_STATUS,
   KITCHEN_SETTABLE_STATUSES,
   LIVE_ITEM_STATUSES,
+  OVERSIGHT_ROLES,
+  READ_ONLY_ROLES,
   ROLES,
   ROLE_HOME,
+  ROLE_LABEL,
   ROLE_VALUES,
+  STAFF_MANAGER_ROLES,
+  UNDEACTIVATABLE_ROLES,
   ROUND_STATUS,
   SERVICE_REQUEST_TYPE,
   SESSION_STATUS,
@@ -43,6 +49,38 @@ describe('roles', () => {
   it('has no duplicate role values', () => {
     const values = Object.values(ROLES);
     expect(new Set(values).size).toBe(values.length);
+  });
+
+  it('names every role for people', () => {
+    // A missing label prints "admin_viewer" on the Staff page and the header.
+    for (const role of ROLE_VALUES) {
+      expect(ROLE_LABEL[role], `no ROLE_LABEL entry for "${role}"`).toBeTruthy();
+    }
+  });
+
+  it('keeps every role group made of real roles', () => {
+    const known = new Set<string>(ROLE_VALUES);
+    for (const group of [
+      FULL_ACCESS_ROLES,
+      STAFF_MANAGER_ROLES,
+      READ_ONLY_ROLES,
+      OVERSIGHT_ROLES,
+      UNDEACTIVATABLE_ROLES,
+    ]) {
+      for (const role of group) expect(known).toContain(role);
+    }
+  });
+
+  it('never lets a read-only role also have full access or manage staff', () => {
+    // Either would quietly turn the view-only account into a real admin.
+    for (const role of READ_ONLY_ROLES) {
+      expect(FULL_ACCESS_ROLES).not.toContain(role);
+      expect(STAFF_MANAGER_ROLES).not.toContain(role);
+    }
+  });
+
+  it('sends every admin role to the admin screens', () => {
+    for (const role of OVERSIGHT_ROLES) expect(ROLE_HOME[role]).toBe('/admin');
   });
 });
 

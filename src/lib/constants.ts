@@ -16,10 +16,39 @@ export const ROLES = {
   KITCHEN: 'kitchen',
   BILLING: 'billing',
   ADMIN: 'admin',
+  /** An admin who can also create and edit staff accounts. */
+  SUPER_ADMIN: 'super_admin',
+  /** Sees every screen an admin sees and can change nothing. */
+  ADMIN_VIEWER: 'admin_viewer',
 } as const;
 
 export type Role = (typeof ROLES)[keyof typeof ROLES];
 export const ROLE_VALUES = Object.values(ROLES) as Role[];
+
+/**
+ * Roles that pass every screen check — the backend's admin bypass. Mirrors
+ * FULL_ACCESS_ROLES on the backend.
+ */
+export const FULL_ACCESS_ROLES: Role[] = [ROLES.ADMIN, ROLES.SUPER_ADMIN];
+
+/** The only roles that may create or change a staff account. Mirrors the backend. */
+export const STAFF_MANAGER_ROLES: Role[] = [ROLES.SUPER_ADMIN];
+
+/**
+ * Roles that see every screen and change nothing. Mirrors the backend, which
+ * refuses any write from these roles in `authenticate` whatever this app shows.
+ */
+export const READ_ONLY_ROLES: Role[] = [ROLES.ADMIN_VIEWER];
+
+/** Every admin role — they share the admin navigation and see the whole café. */
+export const OVERSIGHT_ROLES: Role[] = [...FULL_ACCESS_ROLES, ...READ_ONLY_ROLES];
+
+/**
+ * Roles whose account is never switched off while it holds the role. Mirrors
+ * the backend's UNDEACTIVATABLE_ROLES, so the Staff form does not offer a
+ * checkbox the API will refuse.
+ */
+export const UNDEACTIVATABLE_ROLES: Role[] = [ROLES.ADMIN, ROLES.SUPER_ADMIN];
 
 /** Where each role lands after a PIN login. */
 export const ROLE_HOME: Record<Role, string> = {
@@ -27,6 +56,18 @@ export const ROLE_HOME: Record<Role, string> = {
   [ROLES.KITCHEN]: '/kitchen',
   [ROLES.BILLING]: '/billing',
   [ROLES.ADMIN]: '/admin',
+  [ROLES.SUPER_ADMIN]: '/admin',
+  [ROLES.ADMIN_VIEWER]: '/admin',
+};
+
+/** How a role is written for people. The wire value is never shown on screen. */
+export const ROLE_LABEL: Record<Role, string> = {
+  [ROLES.WAITER]: 'Waiter',
+  [ROLES.KITCHEN]: 'Kitchen',
+  [ROLES.BILLING]: 'Billing',
+  [ROLES.ADMIN]: 'Admin',
+  [ROLES.SUPER_ADMIN]: 'Super admin',
+  [ROLES.ADMIN_VIEWER]: 'Admin (view only)',
 };
 
 // ─── Tables ──────────────────────────────────────────────────────────────────

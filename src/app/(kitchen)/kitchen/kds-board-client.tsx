@@ -8,6 +8,7 @@ import { KotTicketCard } from '@/components/kitchen/kot-ticket-card';
 import type { KotData } from '@/components/kitchen/kot-sheet';
 import { IconCheck, IconSoundOff, IconSoundOn } from '@/components/ui/icons';
 import { ErrorState, LoadingBlock } from '@/components/ui/feedback';
+import { useCanWrite } from '@/hooks/use-can-write';
 import { useNewTicketChime } from '@/hooks/use-new-ticket-chime';
 import {
   ITEM_STATUS,
@@ -54,6 +55,8 @@ export function KdsBoardClient() {
   const [updateItemStatus] = useUpdateItemStatusMutation();
   const [updateRoundStatus] = useUpdateRoundStatusMutation();
   const [busyItemId, setBusyItemId] = useState<string | null>(null);
+  // A view-only admin watches the board; the status buttons are the kitchen's.
+  const canAct = useCanWrite();
   /**
    * The ticket whose paper is being previewed.
    *
@@ -198,8 +201,12 @@ export function KdsBoardClient() {
                 key={ticket.roundId}
                 ticket={ticket}
                 busyItemId={busyItemId}
-                onItemStatus={(target, item, status) => void handleItemStatus(target, item, status)}
-                onAllReady={(target) => void handleAllReady(target)}
+                onItemStatus={
+                  canAct
+                    ? (target, item, status) => void handleItemStatus(target, item, status)
+                    : undefined
+                }
+                onAllReady={canAct ? (target) => void handleAllReady(target) : undefined}
                 onPrintKot={handlePrintKot}
               />
             ))}

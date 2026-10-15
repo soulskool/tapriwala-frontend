@@ -12,8 +12,13 @@ import { ITEM_STATUS_LABEL, cn, formatClockWithDay, formatCurrencyShort } from '
 
 interface KotTicketCardProps {
   ticket: KdsTicket;
-  onItemStatus: (ticket: KdsTicket, item: KdsTicketItem, status: ItemStatus) => void;
-  onAllReady: (ticket: KdsTicket) => void;
+  /**
+   * The status buttons. Omitted for a view-only admin, and so are the buttons:
+   * the card then reads exactly as the kitchen sees it, with nothing to tap.
+   */
+  onItemStatus?: (ticket: KdsTicket, item: KdsTicketItem, status: ItemStatus) => void;
+  /** "All ready". Omitted, with its button, wherever `onItemStatus` is. */
+  onAllReady?: (ticket: KdsTicket) => void;
   /** Opens the print preview. The board owns the modal, not the card. */
   onPrintKot: (ticket: KdsTicket) => void;
   busyItemId?: string | null;
@@ -113,7 +118,7 @@ function KotTicketCardComponent({
             item={item}
             busy={busyItemId === item.itemId}
             showPrice={showPrices}
-            onStatus={(status) => onItemStatus(ticket, item, status)}
+            onStatus={onItemStatus ? (status) => onItemStatus(ticket, item, status) : undefined}
           />
         ))}
       </ul>
@@ -138,7 +143,7 @@ function KotTicketCardComponent({
           <IconPrint aria-hidden className="size-4" /> Print KOT
         </button>
 
-        {!allReady ? (
+        {!allReady && onAllReady ? (
           <button
             type="button"
             onClick={() => onAllReady(ticket)}
@@ -167,7 +172,7 @@ function TicketItemRow({
   item: KdsTicketItem;
   busy: boolean;
   showPrice: boolean;
-  onStatus: (status: ItemStatus) => void;
+  onStatus?: (status: ItemStatus) => void;
 }) {
   const done = item.status === ITEM_STATUS.READY || item.status === ITEM_STATUS.SERVED;
   const cancelled = item.status === ITEM_STATUS.CANCELLED;
@@ -214,7 +219,7 @@ function TicketItemRow({
         </span>
       </div>
 
-      {!done && !cancelled ? (
+      {!done && !cancelled && onStatus ? (
         <div className="mt-2 flex gap-1.5">
           {KITCHEN_SETTABLE_STATUSES.map((status) => (
             <button

@@ -24,10 +24,11 @@ import { useState } from 'react';
 import { Button } from '@/components/ui/button';
 import { ConnectionDot } from '@/components/ui/connection-dot';
 import { Modal } from '@/components/ui/modal';
-import { ROLES } from '@/lib/constants';
+import { ROLES, ROLE_LABEL, type Role } from '@/lib/constants';
 import { cn, initials } from '@/lib/utils';
 import { useSignOut } from '@/hooks/use-sign-out';
 import { useAppSelector } from '@/store/hooks';
+import { canWrite } from '@/store/slices/auth-slice';
 
 interface NavItem {
   href: string;
@@ -42,7 +43,20 @@ interface NavItem {
  * live ops visibility so ownership never has to interrupt staff to find out
  * what is happening on the floor.
  */
-const NAV_BY_ROLE: Record<string, NavItem[]> = {
+const ADMIN_NAV: NavItem[] = [
+  { href: '/admin', label: 'Overview', icon: IconOverview },
+  { href: '/waiter', label: 'Floor', icon: IconFloor },
+  { href: '/kitchen', label: 'Kitchen', icon: IconKitchen },
+  { href: '/billing', label: 'Billing', icon: IconBill },
+  { href: '/waiter/bills', label: 'Billed', icon: IconBilled },
+  { href: '/admin/products', label: 'Menu', icon: IconProducts },
+  { href: '/admin/tables', label: 'Tables', icon: IconTables },
+  { href: '/admin/users', label: 'Staff', icon: IconStaff },
+  { href: '/admin/sales', label: 'Sales', icon: IconSales },
+  { href: '/admin/audit', label: 'Audit', icon: IconAudit },
+];
+
+const NAV_BY_ROLE: Record<Role, NavItem[]> = {
   [ROLES.WAITER]: [
     { href: '/waiter', label: 'Floor', icon: IconFloor },
     // Read-only bill history, so a waiter can settle a "what did we pay?"
@@ -55,18 +69,12 @@ const NAV_BY_ROLE: Record<string, NavItem[]> = {
     { href: '/waiter', label: 'Floor', icon: IconFloor },
     { href: '/waiter/bills', label: 'Billed', icon: IconBilled },
   ],
-  [ROLES.ADMIN]: [
-    { href: '/admin', label: 'Overview', icon: IconOverview },
-    { href: '/waiter', label: 'Floor', icon: IconFloor },
-    { href: '/kitchen', label: 'Kitchen', icon: IconKitchen },
-    { href: '/billing', label: 'Billing', icon: IconBill },
-    { href: '/waiter/bills', label: 'Billed', icon: IconBilled },
-    { href: '/admin/products', label: 'Menu', icon: IconProducts },
-    { href: '/admin/tables', label: 'Tables', icon: IconTables },
-    { href: '/admin/users', label: 'Staff', icon: IconStaff },
-    { href: '/admin/sales', label: 'Sales', icon: IconSales },
-    { href: '/admin/audit', label: 'Audit', icon: IconAudit },
-  ],
+  // The three admin roles see the same screens. What differs is what they may
+  // do on them: staff edits (super admin only) and any write at all (not the
+  // view-only admin) — decided on each screen, and again by the API.
+  [ROLES.ADMIN]: ADMIN_NAV,
+  [ROLES.SUPER_ADMIN]: ADMIN_NAV,
+  [ROLES.ADMIN_VIEWER]: ADMIN_NAV,
 };
 
 interface RoleHeaderProps {
@@ -156,12 +164,20 @@ export function RoleHeader({ title, confirmSignOut = false }: RoleHeaderProps) {
         {/* Spacer so the avatar stays right-aligned once the nav is hidden. */}
         <div className="flex-1 lg:hidden" />
 
+        {/* Says up front why there are no buttons, rather than leaving a
+            view-only admin to wonder whether the screen failed to load. */}
+        {user && !canWrite(user) ? (
+          <span className="border-line bg-surface-sunken text-ink-muted shrink-0 rounded-full border px-2.5 py-0.5 text-xs font-bold">
+            View only
+          </span>
+        ) : null}
+
         <ConnectionDot className="text-ink-muted hidden sm:inline-flex" />
 
         {user ? (
           <div className="flex items-center gap-2">
             <span
-              title={`${user.name} · ${user.role}`}
+              title={`${user.name} · ${ROLE_LABEL[user.role] ?? user.role}`}
               className="bg-brand-600 flex size-9 shrink-0 items-center justify-center rounded-full text-sm font-bold text-white"
             >
               {initials(user.name)}

@@ -6,7 +6,7 @@ import { useState, type FormEvent } from 'react';
 import { Button } from '@/components/ui/button';
 import { TextField } from '@/components/ui/field';
 import { useSignOut } from '@/hooks/use-sign-out';
-import { ROLE_HOME } from '@/lib/constants';
+import { ROLE_HOME, ROLE_LABEL } from '@/lib/constants';
 import { useLoginMutation } from '@/store/api/auth-api';
 import { apiErrorMessage, apiFieldErrors } from '@/store/api/base-query';
 import { useAppDispatch, useAppSelector } from '@/store/hooks';
@@ -60,7 +60,7 @@ export function LoginClient({ wasDenied }: { wasDenied: boolean }) {
         <div>
           <p className="text-ink-muted text-sm">Already signed in as</p>
           <p className="text-lg font-bold">{user.name}</p>
-          <p className="text-ink-muted text-sm capitalize">{user.role}</p>
+          <p className="text-ink-muted text-sm">{ROLE_LABEL[user.role] ?? user.role}</p>
         </div>
 
         <Button size="lg" fullWidth onClick={() => router.replace(ROLE_HOME[user.role])}>

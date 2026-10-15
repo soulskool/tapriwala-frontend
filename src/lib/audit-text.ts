@@ -1,7 +1,9 @@
 import {
   ITEM_STATUS,
+  ROLE_LABEL,
   SESSION_STATUS,
   type ItemStatus,
+  type Role,
   type ServiceRequestType,
   type SessionStatus,
 } from './constants';
@@ -259,7 +261,7 @@ export function describeAudit(entry: AuditEntry): AuditSentence {
     case 'user.created':
       return {
         kind: 'Staff',
-        text: `${actor} added ${str(after.name) || 'a staff member'} as ${str(after.role) || 'staff'}`,
+        text: `${actor} added ${str(after.name) || 'a staff member'} as ${roleName(after.role) || 'staff'}`,
       };
     case 'user.updated':
       return { kind: 'Staff', text: describeUserUpdate(actor, before, after, meta) };
@@ -267,6 +269,15 @@ export function describeAudit(entry: AuditEntry): AuditSentence {
     default:
       return { kind: 'Table', text: `${actor} · ${entry.action}` };
   }
+}
+
+/**
+ * A role as people say it ("super admin", not "super_admin"). Falls back to the
+ * stored value for a role this build does not know, so an old row still reads.
+ */
+function roleName(value: unknown): string {
+  const role = str(value);
+  return (ROLE_LABEL[role as Role] ?? role).toLowerCase();
 }
 
 /** A staff edit, saying what actually changed rather than "updated a user". */
@@ -277,7 +288,7 @@ function describeUserUpdate(actor: string, before: Bag, after: Bag, meta: Bag): 
   if (before.isActive === false && after.isActive === true) changes.push(`reactivated ${name}`);
   if (before.isActive === true && after.isActive === false) changes.push(`deactivated ${name}`);
   if (str(before.role) && str(after.role) && before.role !== after.role) {
-    changes.push(`changed ${name}'s role from ${str(before.role)} to ${str(after.role)}`);
+    changes.push(`changed ${name}'s role from ${roleName(before.role)} to ${roleName(after.role)}`);
   }
   if (str(before.name) && str(after.name) && before.name !== after.name) {
     changes.push(`renamed ${str(before.name)} to ${str(after.name)}`);

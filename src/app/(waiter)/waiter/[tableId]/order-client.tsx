@@ -38,7 +38,7 @@ import {
 } from '@/store/api/session-api';
 import { useLiveGridQuery } from '@/store/api/table-api';
 import { useAppDispatch, useAppSelector } from '@/store/hooks';
-import { canAccess } from '@/store/slices/auth-slice';
+import { canAccess, canWrite } from '@/store/slices/auth-slice';
 import { toastPushed } from '@/store/slices/ui-slice';
 
 /**
@@ -53,9 +53,16 @@ export function TableOrderClient({ tableId }: { tableId: string }) {
   const router = useRouter();
   const user = useAppSelector((state) => state.auth.user);
 
+  /**
+   * False for the view-only admin: it reads the table in full and orders,
+   * serves, cancels, requests and frees nothing. Every write control below
+   * checks it; the API refuses those writes regardless.
+   */
+  const canAct = canWrite(user);
+
   // Mirrors `authorize(ROLES.BILLING)` on the backend route, admin bypass and
   // all -- a waiter must not be able to walk away from an unpaid table.
-  const canFreeTable = canAccess(user, [ROLES.BILLING]);
+  const canFreeTable = canAct && canAccess(user, [ROLES.BILLING]);
 
   // Same role test, deliberately named separately: settling a table and writing
   // one off are different decisions that could reasonably diverge later.
@@ -266,14 +273,15 @@ export function TableOrderClient({ tableId }: { tableId: string }) {
           {/* Kept for everyone, including billing: an admin crossing the floor
               may want to flag a table for whoever is actually on the counter
               rather than settle it themselves. */}
-          {sessionId ? (
+          {sessionId && canAct ? (
             <Button variant="secondary" onClick={() => void handleRequestBill()}>
               <IconBill aria-hidden className="mr-1.5 inline size-4" /> Request bill
             </Button>
           ) : null}
           {sessionId && canSettleTable ? (
             <Button onClick={() => router.push(`/billing/${sessionId}`)}>
-              <IconBill aria-hidden className="mr-1.5 inline size-4" /> Bill this table
+              <IconBill aria-hidden className="mr-1.5 inline size-4" />{' '}
+              {canAct ? 'Bill this table' : 'View bill'}
             </Button>
           ) : null}
           {sessionId && canFreeTable ? (
@@ -318,12 +326,21 @@ export function TableOrderClient({ tableId }: { tableId: string }) {
 
           {!sessionId ? (
             <div className="rounded-card border-line bg-surface border border-dashed px-6 py-10 text-center">
-              <p className="text-ink-muted mb-3">
-                This table is empty. Adding the first item opens it.
-              </p>
-              <Button isLoading={isOpening} onClick={() => void openSession({ tableId }).unwrap()}>
-                Open table now
-              </Button>
+              {canAct ? (
+                <>
+                  <p className="text-ink-muted mb-3">
+                    This table is empty. Adding the first item opens it.
+                  </p>
+                  <Button
+                    isLoading={isOpening}
+                    onClick={() => void openSession({ tableId }).unwrap()}
+                  >
+                    Open table now
+                  </Button>
+                </>
+              ) : (
+                <p className="text-ink-muted">This table is empty.</p>
+              )}
             </div>
           ) : detail.isLoading ? (
             <LoadingBlock label="Loading the order…" />
@@ -335,25 +352,31 @@ export function TableOrderClient({ tableId }: { tableId: string }) {
             <SessionRounds
               rounds={rounds}
               busyItemId={busyItemId}
-              onItemStatus={(round, item, status) => void handleItemStatus(round, item, status)}
-              onCancelItem={(round, item) => setCancelTarget({ round, item })}
+              onItemStatus={
+                canAct
+                  ? (round, item, status) => void handleItemStatus(round, item, status)
+                  : undefined
+              }
+              onCancelItem={canAct ? (round, item) => setCancelTarget({ round, item }) : undefined}
               onPrintKot={canPrintKot ? (round) => setPrintTarget(kotFromRound(round)) : undefined}
             />
           )}
         </section>
 
-        <section aria-label="Add items" className="flex min-w-0 flex-col gap-3">
-          <h2 className="text-lg font-bold">Add items</h2>
-          <ItemPicker
-            menu={menu}
-            quantityOf={cart.quantityOf}
-            onAdd={(item) => cart.add(item)}
-            onSetQuantity={handleSetQuantity}
-          />
-        </section>
+        {canAct ? (
+          <section aria-label="Add items" className="flex min-w-0 flex-col gap-3">
+            <h2 className="text-lg font-bold">Add items</h2>
+            <ItemPicker
+              menu={menu}
+              quantityOf={cart.quantityOf}
+              onAdd={(item) => cart.add(item)}
+              onSetQuantity={handleSetQuantity}
+            />
+          </section>
+        ) : null}
       </div>
 
-      {!cart.isEmpty ? (
+      {canAct && !cart.isEmpty ? (
         <div className="border-line bg-surface/95 print-hidden fixed inset-x-0 bottom-0 z-30 border-t px-4 py-3 backdrop-blur">
           <div className="mx-auto flex max-w-[1600px] items-center gap-3">
             <div className="flex-1">

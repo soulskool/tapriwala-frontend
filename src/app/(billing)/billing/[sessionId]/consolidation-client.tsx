@@ -12,6 +12,7 @@ import { Button } from '@/components/ui/button';
 import { TextAreaField } from '@/components/ui/field';
 import { ErrorState, LoadingBlock } from '@/components/ui/feedback';
 import { Modal } from '@/components/ui/modal';
+import { useCanWrite } from '@/hooks/use-can-write';
 import { EXPORT_METHOD, EXPORT_STATUS, SESSION_STATUS } from '@/lib/constants';
 import type { BillingExport } from '@/lib/types';
 import { cn, formatBillTotal, formatCurrency, formatDateTime } from '@/lib/utils';
@@ -75,6 +76,9 @@ export function ConsolidationClient({ sessionId }: { sessionId: string }) {
   const [exportBill, { isLoading: isExporting }] = useExportBillMutation();
   const [confirmExport] = useConfirmExportMutation();
   const [closeSession, { isLoading: isClosing }] = useCloseSessionMutation();
+  // A view-only admin reads, downloads and prints the bill; it never saves,
+  // settles or frees one.
+  const canAct = useCanWrite();
 
   const [lastExport, setLastExport] = useState<BillingExport | null>(null);
   const [closeOpen, setCloseOpen] = useState(false);
@@ -314,7 +318,7 @@ export function ConsolidationClient({ sessionId }: { sessionId: string }) {
            * itself. This is for the counter who wants the number in hand — to
            * print it and hand it over — before the guest has actually paid.
            */}
-          {!isClosed && (!savedBill || isStale) ? (
+          {canAct && !isClosed && (!savedBill || isStale) ? (
             <Button
               variant={isStale ? 'primary' : 'secondary'}
               isLoading={isExporting}
@@ -407,7 +411,11 @@ export function ConsolidationClient({ sessionId }: { sessionId: string }) {
             <ExportPanel record={savedBill} isStale={isStale} onPrint={handlePrint} />
           ) : null}
 
-          {!isClosed ? (
+          {isClosed ? null : !canAct ? (
+            <p className="rounded-card border-line bg-surface text-ink-muted print-hidden border px-4 py-3 text-center text-sm">
+              This table is still open. Settling it is done at the counter.
+            </p>
+          ) : (
             <div className="print-hidden flex flex-col gap-2">
               <Button variant="success" size="lg" fullWidth onClick={() => setCloseOpen(true)}>
                 Payment taken — close table
@@ -416,11 +424,13 @@ export function ConsolidationClient({ sessionId }: { sessionId: string }) {
                 Free table without charging
               </Button>
             </div>
-          ) : (
+          )}
+
+          {isClosed ? (
             <p className="rounded-card border-line bg-surface text-ink-muted print-hidden border px-4 py-3 text-center text-sm">
               This session is closed. The table is free.
             </p>
-          )}
+          ) : null}
 
           <SessionRoundsSummary
             roundCount={data.roundCount}
