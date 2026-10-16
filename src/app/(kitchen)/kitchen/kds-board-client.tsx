@@ -4,7 +4,7 @@ import { useMemo, useState } from 'react';
 
 import { BillingNowPanel } from '@/components/kitchen/billing-now-panel';
 import { KotPrintModal } from '@/components/kitchen/kot-print-modal';
-import { KotTicketCard } from '@/components/kitchen/kot-ticket-card';
+import { KotTableCard } from '@/components/kitchen/kot-table-card';
 import type { KotData } from '@/components/kitchen/kot-sheet';
 import { IconCheck, IconSoundOff, IconSoundOn } from '@/components/ui/icons';
 import { ErrorState, LoadingBlock } from '@/components/ui/feedback';
@@ -16,6 +16,7 @@ import {
   type ItemStatus,
   type KitchenStation,
 } from '@/lib/constants';
+import { groupTicketsByTable } from '@/lib/kds-groups';
 import type { KdsTicket, KdsTicketItem } from '@/lib/types';
 import { cn } from '@/lib/utils';
 import { apiErrorMessage } from '@/store/api/base-query';
@@ -82,6 +83,10 @@ export function KdsBoardClient() {
       }))
       .filter((ticket) => ticket.items.length > 0);
   }, [tickets, station]);
+
+  // One card per table, its rounds stacked inside. Grouped after the station
+  // filter, so the Beverage tab shows a table only for the rounds with drinks.
+  const tables = useMemo(() => groupTicketsByTable(visible), [visible]);
 
   async function handleItemStatus(ticket: KdsTicket, item: KdsTicketItem, status: ItemStatus) {
     setBusyItemId(item.itemId);
@@ -155,7 +160,9 @@ export function KdsBoardClient() {
           />
         ))}
 
-        <span className="text-ink-muted ml-1 text-sm tabular-nums">{visible.length} live</span>
+        <span className="text-ink-muted ml-1 text-sm tabular-nums">
+          {tables.length} {tables.length === 1 ? 'table' : 'tables'} · {visible.length} live
+        </span>
 
         <button
           type="button"
@@ -196,10 +203,10 @@ export function KdsBoardClient() {
            * the board on a phone should not have to pan it.
            */
           <div className="grid grid-cols-[repeat(auto-fill,minmax(min(20rem,100%),1fr))] gap-3">
-            {visible.map((ticket) => (
-              <KotTicketCard
-                key={ticket.roundId}
-                ticket={ticket}
+            {tables.map((group) => (
+              <KotTableCard
+                key={group.sessionId}
+                group={group}
                 busyItemId={busyItemId}
                 onItemStatus={
                   canAct

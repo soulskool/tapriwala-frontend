@@ -7,11 +7,12 @@ import { ElapsedTimer } from '@/components/kitchen/elapsed-timer';
 import { OrderTypePill } from '@/components/ui/order-type-pill';
 import { useElapsedMinutes, urgencyFor } from '@/hooks/use-elapsed';
 import { ITEM_STATUS, KITCHEN_SETTABLE_STATUSES, type ItemStatus } from '@/lib/constants';
+import { isTicketAllReady, oldestOpenTicket, type KdsTableGroup } from '@/lib/kds-groups';
 import type { KdsTicket, KdsTicketItem } from '@/lib/types';
 import { ITEM_STATUS_LABEL, cn, formatClockWithDay, formatCurrencyShort } from '@/lib/utils';
 
-interface KotTicketCardProps {
-  ticket: KdsTicket;
+interface KotTableCardProps {
+  group: KdsTableGroup;
   /**
    * The status buttons. Omitted for a view-only admin, and so are the buttons:
    * the card then reads exactly as the kitchen sees it, with nothing to tap.
@@ -31,39 +32,27 @@ const BORDER_BY_URGENCY = {
 } as const;
 
 /**
- * One order round, as a card on the kitchen board.
+ * One table, as a card on the kitchen board, holding every round it is
+ * waiting on.
  *
- * One card per round, never merged with another round for the same table:
- * two teas ordered an hour apart are two cooking jobs with two timers. Billing
- * is where they become one line — not here.
+ * The rounds are stacked inside, not merged: two teas ordered an hour apart
+ * are still two cooking jobs, each with its own KOT, timer and "All ready".
+ * Billing is where they become one line — not here. What the card adds is that
+ * a cook sees the whole table in one place, with the add-on marked.
  */
-function KotTicketCardComponent({
-  ticket,
+function KotTableCardComponent({
+  group,
   onItemStatus,
   onAllReady,
   onPrintKot,
   busyItemId,
-}: KotTicketCardProps) {
-  const minutes = useElapsedMinutes(ticket.placedAt);
+}: KotTableCardProps) {
+  // The card's border follows the round the kitchen still owes, not round 1
+  // once it is plated (see `oldestOpenTicket`).
+  const lead = oldestOpenTicket(group);
+  const minutes = useElapsedMinutes(lead.placedAt);
   const urgency = urgencyFor(minutes);
-
-  /*
-   * Per-item rates stay folded away by default.
-   *
-   * The card's job is still "cook this" — a column of prices next to every
-   * line competes with the quantity, which is the number that must be readable
-   * from across the kitchen. The round total is always on show because that is
-   * what gets shouted over the pass; the breakdown is one tap away for the
-   * times someone actually needs it.
-   */
-  const [showPrices, setShowPrices] = useState(false);
-
-  const liveItems = ticket.items.filter((item) => item.status !== ITEM_STATUS.CANCELLED);
-  const allReady =
-    liveItems.length > 0 &&
-    liveItems.every(
-      (item) => item.status === ITEM_STATUS.READY || item.status === ITEM_STATUS.SERVED,
-    );
+  const rounds = group.tickets.length;
 
   return (
     <article
@@ -75,25 +64,83 @@ function KotTicketCardComponent({
     >
       <header className="border-line flex items-start justify-between gap-2 border-b px-3 py-2.5">
         <div>
-          <div className="flex items-center gap-2">
-            <span className="text-3xl leading-none font-black">{ticket.tableCode}</span>
+          <span className="text-3xl leading-none font-black">{group.tableCode}</span>
+          <p className="text-ink-muted mt-0.5 text-xs">
+            {group.zone}
+            {rounds > 1 ? ` · ${rounds} rounds` : null}
+          </p>
+        </div>
+        <ElapsedTimer since={lead.placedAt} className="text-xl" />
+      </header>
+
+      <div className="divide-line flex flex-1 flex-col divide-y-4">
+        {group.tickets.map((ticket) => (
+          <RoundSection
+            key={ticket.roundId}
+            ticket={ticket}
+            showTimer={rounds > 1}
+            busyItemId={busyItemId}
+            onItemStatus={onItemStatus}
+            onAllReady={onAllReady}
+            onPrintKot={onPrintKot}
+          />
+        ))}
+      </div>
+    </article>
+  );
+}
+
+/**
+ * One round inside the table card — the old ticket card, minus the outer box.
+ */
+function RoundSection({
+  ticket,
+  showTimer,
+  onItemStatus,
+  onAllReady,
+  onPrintKot,
+  busyItemId,
+}: Omit<KotTableCardProps, 'group'> & { ticket: KdsTicket; showTimer: boolean }) {
+  /*
+   * Per-item rates stay folded away by default.
+   *
+   * The card's job is still "cook this" — a column of prices next to every
+   * line competes with the quantity, which is the number that must be readable
+   * from across the kitchen. The round total is always on show because that is
+   * what gets shouted over the pass; the breakdown is one tap away for the
+   * times someone actually needs it.
+   */
+  const [showPrices, setShowPrices] = useState(false);
+  const allReady = isTicketAllReady(ticket);
+
+  return (
+    <section
+      aria-label={`Round ${ticket.roundNumber}, KOT ${ticket.kotId}`}
+      className="flex flex-col"
+    >
+      <div className="bg-surface-sunken flex items-start justify-between gap-2 px-3 py-1.5">
+        <div className="min-w-0">
+          <div className="flex flex-wrap items-center gap-1.5">
             {ticket.isAddOn ? (
               <span className="bg-brand-500 rounded-md px-1.5 py-0.5 text-xs font-black text-white">
                 ADD-ON R{ticket.roundNumber}
               </span>
-            ) : null}
-            {/* Next to the table code, not buried in the meta line: a cook
-                plating a parcel packs it instead of dressing a plate, and
-                finding that out at the end is finding out too late. */}
+            ) : (
+              <span className="text-xs font-black">R{ticket.roundNumber}</span>
+            )}
+            {/* On each round, not the card: one table can send a dine-in round
+                and then a parcel, and a cook plating a parcel packs it instead
+                of dressing a plate. */}
             <OrderTypePill orderType={ticket.orderType} />
           </div>
           <p className="text-ink-muted mt-0.5 text-xs">
-            KOT {ticket.kotId} · {formatClockWithDay(ticket.placedAt)} · {ticket.zone}
+            KOT {ticket.kotId} · {formatClockWithDay(ticket.placedAt)}
           </p>
         </div>
 
-        <div className="flex flex-col items-end gap-1">
-          <ElapsedTimer since={ticket.placedAt} className="text-xl" />
+        <div className="flex shrink-0 items-center gap-2">
+          {/* The card header already shows the age of a single round. */}
+          {showTimer ? <ElapsedTimer since={ticket.placedAt} className="text-sm" /> : null}
           <button
             type="button"
             onClick={() => setShowPrices((current) => !current)}
@@ -109,9 +156,9 @@ function KotTicketCardComponent({
             {formatCurrencyShort(ticket.total)}
           </button>
         </div>
-      </header>
+      </div>
 
-      <ul className="divide-line flex flex-1 flex-col divide-y">
+      <ul className="divide-line flex flex-col divide-y">
         {ticket.items.map((item) => (
           <TicketItemRow
             key={item.itemId}
@@ -131,7 +178,7 @@ function KotTicketCardComponent({
       ) : null}
 
       <footer className="border-line flex gap-2 border-t p-2">
-        {/* Available for the whole life of the ticket, including after it is
+        {/* Available for the whole life of the round, including after it is
             all ready: a lost or smudged docket gets reprinted, and that is
             most likely to be noticed once the food is under the pass. */}
         <button
@@ -149,11 +196,13 @@ function KotTicketCardComponent({
             onClick={() => onAllReady(ticket)}
             className="min-h-touch bg-status-ready flex-1 rounded-lg text-base font-bold text-white transition hover:brightness-110 active:brightness-95"
           >
-            All ready
+            {/* Says which round, so "All ready" on an add-on is never read as
+                the whole table. */}
+            {ticket.isAddOn ? `R${ticket.roundNumber} ready` : 'All ready'}
           </button>
         ) : null}
       </footer>
-    </article>
+    </section>
   );
 }
 
@@ -246,4 +295,4 @@ function TicketItemRow({
  * Memoised. A busy board holds dozens of cards and every socket tick would
  * otherwise re-render all of them — including their timers.
  */
-export const KotTicketCard = memo(KotTicketCardComponent);
+export const KotTableCard = memo(KotTableCardComponent);
