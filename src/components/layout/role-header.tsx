@@ -28,7 +28,6 @@ import { ROLES, ROLE_LABEL, type Role } from '@/lib/constants';
 import { cn, initials } from '@/lib/utils';
 import { useSignOut } from '@/hooks/use-sign-out';
 import { useAppSelector } from '@/store/hooks';
-import { canWrite } from '@/store/slices/auth-slice';
 
 interface NavItem {
   href: string;
@@ -163,14 +162,6 @@ export function RoleHeader({ title, confirmSignOut = false }: RoleHeaderProps) {
 
         {/* Spacer so the avatar stays right-aligned once the nav is hidden. */}
         <div className="flex-1 lg:hidden" />
-
-        {/* Says up front why there are no buttons, rather than leaving a
-            view-only admin to wonder whether the screen failed to load. */}
-        {user && !canWrite(user) ? (
-          <span className="border-line bg-surface-sunken text-ink-muted shrink-0 rounded-full border px-2.5 py-0.5 text-xs font-bold">
-            View only
-          </span>
-        ) : null}
 
         <ConnectionDot className="text-ink-muted hidden sm:inline-flex" />
 
