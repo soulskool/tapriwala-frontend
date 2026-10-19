@@ -111,7 +111,7 @@ export function UsersClient() {
 
       {!canManage ? (
         <p className="rounded-card border-line bg-surface text-ink-muted border px-4 py-2.5 text-sm">
-          Only a super admin can add staff or change their details, PINs and roles.
+          Only an Admins account can add staff or change their details, PINs and roles.
         </p>
       ) : null}
 
@@ -167,7 +167,7 @@ export function UsersClient() {
               options={ROLE_VALUES.map((role) => ({ value: role, label: ROLE_LABEL[role] }))}
               hint={
                 editing.role === ROLES.SUPER_ADMIN
-                  ? 'Can add and edit staff, including other super admins.'
+                  ? 'Can add and edit staff, including other Admins accounts.'
                   : editing.role === ROLES.ADMIN_VIEWER
                     ? 'Sees every screen and report, cannot change anything.'
                     : undefined

@@ -66,8 +66,8 @@ export const ROLE_LABEL: Record<Role, string> = {
   [ROLES.KITCHEN]: 'Kitchen',
   [ROLES.BILLING]: 'Billing',
   [ROLES.ADMIN]: 'Admin',
-  [ROLES.SUPER_ADMIN]: 'Super admin',
-  [ROLES.ADMIN_VIEWER]: 'Admin (view only)',
+  [ROLES.SUPER_ADMIN]: 'Admins',
+  [ROLES.ADMIN_VIEWER]: 'AdminV',
 };
 
 // ─── Tables ──────────────────────────────────────────────────────────────────

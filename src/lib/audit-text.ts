@@ -272,7 +272,7 @@ export function describeAudit(entry: AuditEntry): AuditSentence {
 }
 
 /**
- * A role as people say it ("super admin", not "super_admin"). Falls back to the
+ * A role as people say it ("admins", not "super_admin"). Falls back to the
  * stored value for a role this build does not know, so an old row still reads.
  */
 function roleName(value: unknown): string {

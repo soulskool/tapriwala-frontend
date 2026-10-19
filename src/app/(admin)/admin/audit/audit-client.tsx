@@ -16,6 +16,7 @@ import { useState, type ComponentType } from 'react';
 import { Button } from '@/components/ui/button';
 import { EmptyState, ErrorState, LoadingBlock } from '@/components/ui/feedback';
 import { useDebouncedValue } from '@/hooks/use-debounce';
+import { ROLE_LABEL, type Role } from '@/lib/constants';
 import { describeAudit, type AuditKind } from '@/lib/audit-text';
 import type { AuditEntry } from '@/lib/types';
 import { cn, formatClock } from '@/lib/utils';
@@ -215,7 +216,8 @@ function AuditRow({ entry }: { entry: AuditEntry }) {
       {open ? (
         <div className="border-line flex flex-col gap-3 border-t px-3.5 py-3">
           <p className="text-ink-muted font-mono text-xs">
-            {entry.action} · {entry.actor.name || '—'} ({entry.actor.role})
+            {entry.action} · {entry.actor.name || '—'} (
+            {ROLE_LABEL[entry.actor.role as Role] ?? entry.actor.role})
             {entry.sessionId ? ` · session ${entry.sessionId}` : ''}
           </p>
           <div className="grid gap-3 sm:grid-cols-2">
