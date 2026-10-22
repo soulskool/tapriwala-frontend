@@ -97,9 +97,9 @@ export function formatElapsed(minutes: number): string {
 
 /** 7:32 PM — when a round was placed. */
 export function formatClock(iso: string | null | undefined): string {
-  if (!iso) return '—';
+  if (!iso) return '-';
   const date = new Date(iso);
-  if (Number.isNaN(date.getTime())) return '—';
+  if (Number.isNaN(date.getTime())) return '-';
   return date.toLocaleTimeString('en-IN', { hour: 'numeric', minute: '2-digit', hour12: true });
 }
 
@@ -115,9 +115,9 @@ export function formatClock(iso: string | null | undefined): string {
  * function, and so a test can pin the day without pinning the clock.
  */
 export function formatClockWithDay(iso: string | null | undefined, now = new Date()): string {
-  if (!iso) return '—';
+  if (!iso) return '-';
   const date = new Date(iso);
-  if (Number.isNaN(date.getTime())) return '—';
+  if (Number.isNaN(date.getTime())) return '-';
 
   const sameDay =
     date.getDate() === now.getDate() &&
@@ -133,9 +133,9 @@ export function formatClockWithDay(iso: string | null | undefined, now = new Dat
 
 /** 12 Aug, 7:32 PM — for history lists where the day matters. */
 export function formatDateTime(iso: string | null | undefined): string {
-  if (!iso) return '—';
+  if (!iso) return '-';
   const date = new Date(iso);
-  if (Number.isNaN(date.getTime())) return '—';
+  if (Number.isNaN(date.getTime())) return '-';
   return date.toLocaleString('en-IN', {
     day: 'numeric',
     month: 'short',

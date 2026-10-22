@@ -115,7 +115,7 @@ export function describeAudit(entry: AuditEntry): AuditSentence {
         kind: 'Table',
         text:
           `${actor} freed ${table || 'the table'} without a bill` +
-          (writtenOff > 0 ? ` — ${writtenOff} item${writtenOff === 1 ? '' : 's'} written off` : ''),
+          (writtenOff > 0 ? `, ${writtenOff} item${writtenOff === 1 ? '' : 's'} written off` : ''),
       };
     }
 
@@ -146,7 +146,7 @@ export function describeAudit(entry: AuditEntry): AuditSentence {
         text:
           `${actor} ordered ${items.map((item) => itemPhrase(item, names)).join(', ') || 'items'}` +
           `${onTable(entry)}${parcel}` +
-          (kot || total ? ` — ${[kot && `KOT ${kot}`, total].filter(Boolean).join(', ')}` : ''),
+          (kot || total ? `: ${[kot && `KOT ${kot}`, total].filter(Boolean).join(', ')}` : ''),
       };
     }
 
@@ -167,14 +167,14 @@ export function describeAudit(entry: AuditEntry): AuditSentence {
       if (Array.isArray(meta.items)) {
         return {
           kind: 'Kitchen',
-          text: `${actor} wrote off ${(meta.items as unknown[]).map(str).join(', ')}${onTable(entry)} — table freed without a bill`,
+          text: `${actor} wrote off ${(meta.items as unknown[]).map(str).join(', ')}${onTable(entry)}, table freed without a bill`,
         };
       }
       const reason = str(meta.reason);
       const cooked = meta.cancelledAfterPrep ? ' after it was cooked' : '';
       return {
         kind: 'Kitchen',
-        text: `${actor} cancelled ${itemPhrase(meta, names)}${onTable(entry)}${cooked}${reason ? ` — “${reason}”` : ''}`,
+        text: `${actor} cancelled ${itemPhrase(meta, names)}${onTable(entry)}${cooked}${reason ? `: “${reason}”` : ''}`,
       };
     }
 
@@ -204,7 +204,7 @@ export function describeAudit(entry: AuditEntry): AuditSentence {
         kind: 'Bill',
         text:
           `${actor} generated bill${number !== null ? ` #${number}` : ''}${table ? ` for ${table}` : ''}` +
-          (total ? ` — ${total}` : ''),
+          (total ? `: ${total}` : ''),
       };
     }
     case 'billing.export_retried':

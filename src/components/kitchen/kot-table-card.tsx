@@ -258,7 +258,7 @@ function TicketItemRow({
           {item.unavailable && !cancelled ? (
             <p className="text-status-cancelled mt-1 flex items-center gap-1.5 text-sm font-bold">
               <IconWarning aria-hidden className="size-4 shrink-0" />
-              Marked unavailable — check with the floor
+              Marked unavailable: check with the floor
             </p>
           ) : null}
         </div>

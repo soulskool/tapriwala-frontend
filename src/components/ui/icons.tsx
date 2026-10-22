@@ -4,6 +4,10 @@ import {
   LuArrowLeft,
   LuBell,
   LuBellOff,
+  LuBluetooth,
+  LuBluetoothConnected,
+  LuBluetoothOff,
+  LuBluetoothSearching,
   LuBookText,
   LuCamera,
   LuChartColumn,
@@ -30,6 +34,7 @@ import {
   LuPrinter,
   LuReceiptText,
   LuSearch,
+  LuSmartphone,
   LuShoppingBag,
   LuTrash2,
   LuTriangleAlert,
@@ -85,6 +90,17 @@ export const IconRequest = LuConciergeBell;
 export const IconSoundOn = LuBell;
 export const IconSoundOff = LuBellOff;
 export const IconCamera = LuCamera;
+
+/*
+ * The printer's connection, always drawn next to its label (rule 11): the
+ * header chip says "Connected" or "Not connected" in words as well.
+ */
+export const IconPrinterConnected = LuBluetoothConnected;
+export const IconPrinterConnecting = LuBluetoothSearching;
+export const IconPrinterDisconnected = LuBluetoothOff;
+export const IconBluetooth = LuBluetooth;
+/** The RawBT app on the tablet — the page hands the job to another app. */
+export const IconRawbt = LuSmartphone;
 
 // ─── Navigation ──────────────────────────────────────────────────────────────
 

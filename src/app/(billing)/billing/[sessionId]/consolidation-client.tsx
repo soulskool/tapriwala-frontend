@@ -7,13 +7,14 @@ import { useState } from 'react';
 import { IconBack, IconDownload, IconPrint, IconWarning } from '@/components/ui/icons';
 import { BillSummary } from '@/components/billing/bill-summary';
 import { ConsolidatedLineItem } from '@/components/billing/consolidated-line-item';
-import { ReceiptSheet } from '@/components/billing/receipt-sheet';
+import { ReceiptSheet, type ReceiptSheetProps } from '@/components/billing/receipt-sheet';
 import { Button } from '@/components/ui/button';
 import { TextAreaField } from '@/components/ui/field';
 import { ErrorState, LoadingBlock } from '@/components/ui/feedback';
 import { Modal } from '@/components/ui/modal';
 import { useCanWrite } from '@/hooks/use-can-write';
 import { EXPORT_METHOD, EXPORT_STATUS, SESSION_STATUS } from '@/lib/constants';
+import { printDocument } from '@/lib/print/print-document';
 import type { BillingExport } from '@/lib/types';
 import { cn, formatBillTotal, formatCurrency, formatDateTime } from '@/lib/utils';
 import { apiErrorMessage } from '@/store/api/base-query';
@@ -116,12 +117,23 @@ export function ConsolidationClient({ sessionId }: { sessionId: string }) {
    * The timestamp is frozen at the moment of printing rather than read inside
    * the component: a re-render mid-print would otherwise put a different time
    * on the paper than the one the guest was shown.
+   *
+   * `printDocument` decides how: this device's System mode runs the old path
+   * (the hidden sheet + `window.print()`), a direct mode sends the same
+   * receipt to the printer as ESC/POS. Both count as a print, so the second
+   * one is a DUPLICATE either way.
    */
-  function handlePrint() {
-    setPrintedAt(new Date().toISOString());
-    setPrintCount((count) => count + 1);
-    // Let React paint the frozen timestamp before the browser freezes the page.
-    requestAnimationFrame(() => window.print());
+  function handlePrint(receipt: Pick<ReceiptSheetProps, 'bill' | 'billNumber'>) {
+    const now = new Date().toISOString();
+    const count = printCount + 1;
+    setPrintedAt(now);
+    setPrintCount(count);
+    printDocument(
+      { kind: 'receipt', receipt: { ...receipt, printedAt: now, isReprint: count > 1 } },
+      () =>
+        // Let React paint the frozen timestamp before the browser freezes the page.
+        requestAnimationFrame(() => window.print()),
+    );
   }
 
   async function handleExport() {
@@ -232,11 +244,11 @@ export function ConsolidationClient({ sessionId }: { sessionId: string }) {
       await closeSession({
         sessionId,
         force: true,
-        note: `Freed without billing — ${freeReason.trim()}`,
+        note: `Freed without billing: ${freeReason.trim()}`,
       }).unwrap();
 
       dispatch(
-        toastPushed(`${bill.data?.tableCode ?? 'Table'} is free — nothing charged`, 'success'),
+        toastPushed(`${bill.data?.tableCode ?? 'Table'} is free, nothing charged`, 'success'),
       );
       router.push('/billing');
     } catch (error) {
@@ -270,6 +282,10 @@ export function ConsolidationClient({ sessionId }: { sessionId: string }) {
       : data;
 
   const isClosed = data.status === SESSION_STATUS.CLOSED;
+
+  /** The paper as it stands — the hidden sheet below renders the same two props. */
+  const printReceipt = () =>
+    handlePrint({ bill: charged, billNumber: isStale ? undefined : savedBill?.billNumber });
 
   /**
    * The table both ate here and carried something out.
@@ -310,7 +326,7 @@ export function ConsolidationClient({ sessionId }: { sessionId: string }) {
           >
             <IconDownload aria-hidden className="mr-1.5 inline size-4" /> CSV
           </Button>
-          <Button variant="secondary" onClick={handlePrint}>
+          <Button variant="secondary" onClick={printReceipt}>
             <IconPrint aria-hidden className="mr-1.5 inline size-4" /> Print
           </Button>
           {/*
@@ -336,7 +352,7 @@ export function ConsolidationClient({ sessionId }: { sessionId: string }) {
           className="rounded-card border-status-pending/40 bg-status-pending-soft text-status-pending-ink print-hidden border px-4 py-3 text-sm"
         >
           <IconWarning aria-hidden className="mr-1 inline size-4" /> Items were cancelled after the
-          kitchen started them. This session is held for a manager to look at — closing it will be
+          kitchen started them. This session is held for a manager to look at. Closing it will be
           recorded as an override.
         </p>
       ) : null}
@@ -387,7 +403,7 @@ export function ConsolidationClient({ sessionId }: { sessionId: string }) {
                       colSpan={5}
                       className="bg-surface-muted text-ink-muted px-3 py-1.5 text-xs font-semibold tracking-wide uppercase"
                     >
-                      Cancelled — not billed, kept for the record
+                      Cancelled: not billed, kept for the record
                     </td>
                   </tr>
                   {data.cancelledLines.map((line) => (
@@ -408,7 +424,7 @@ export function ConsolidationClient({ sessionId }: { sessionId: string }) {
           <BillSummary bill={charged} />
 
           {savedBill ? (
-            <ExportPanel record={savedBill} isStale={isStale} onPrint={handlePrint} />
+            <ExportPanel record={savedBill} isStale={isStale} onPrint={printReceipt} />
           ) : null}
 
           {isClosed ? null : !canAct ? (
@@ -418,7 +434,7 @@ export function ConsolidationClient({ sessionId }: { sessionId: string }) {
           ) : (
             <div className="print-hidden flex flex-col gap-2">
               <Button variant="success" size="lg" fullWidth onClick={() => setCloseOpen(true)}>
-                Payment taken — close table
+                Payment taken, close table
               </Button>
               <Button variant="danger" fullWidth onClick={() => setFreeOpen(true)}>
                 Free table without charging
@@ -463,7 +479,7 @@ export function ConsolidationClient({ sessionId }: { sessionId: string }) {
       >
         <p className="mb-3 text-sm">
           <span className="font-semibold tabular-nums">{formatCurrency(data.total)}</span> will not
-          be collected. A reason is required — it goes on the audit trail with your name.
+          be collected. A reason is required. It goes on the audit trail with your name.
         </p>
         <TextAreaField
           label="Reason"
@@ -479,7 +495,7 @@ export function ConsolidationClient({ sessionId }: { sessionId: string }) {
         open={closeOpen}
         onClose={() => setCloseOpen(false)}
         title={`Close table ${data.tableCode}?`}
-        description="The bill is saved to Billed with its own number, marked paid, and the table goes free. Nothing is deleted — the whole session stays queryable."
+        description="The bill is saved to Billed with its own number, marked paid, and the table goes free. Nothing is deleted. The whole session stays queryable."
         footer={
           <>
             <Button variant="secondary" onClick={() => setCloseOpen(false)}>
@@ -563,7 +579,7 @@ function ExportPanel({
         {paid
           ? `Paid and closed ${formatDateTime(record.confirmedAt ?? record.generatedAt)}.`
           : isStale
-            ? `This table has ordered since bill ${record.billNumber} was saved — it is for ${formatCurrency(record.total)}, the table now owes more. Taking payment issues a fresh bill for the correct amount; press “Update bill” if you want the new number first.`
+            ? `This table has ordered since bill ${record.billNumber} was saved. It is for ${formatCurrency(record.total)}, and the table now owes more. Taking payment issues a fresh bill for the correct amount; press “Update bill” if you want the new number first.`
             : 'Saved to Billed. Taking payment will mark it paid and free the table.'}
       </p>
 

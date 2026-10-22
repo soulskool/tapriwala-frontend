@@ -203,7 +203,7 @@ export function UsersClient() {
                   onChange={(event) => setEditing({ ...editing, isActive: event.target.checked })}
                   className="size-4"
                 />
-                Active — can sign in
+                Active: can sign in
               </label>
             ) : null}
 

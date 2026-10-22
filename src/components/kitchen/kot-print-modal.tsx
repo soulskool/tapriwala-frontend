@@ -7,6 +7,7 @@ import { Button } from '@/components/ui/button';
 import { IconPrint } from '@/components/ui/icons';
 import { Modal } from '@/components/ui/modal';
 import { OrderTypePill } from '@/components/ui/order-type-pill';
+import { printDocument } from '@/lib/print/print-document';
 
 /**
  * "How will this KOT print?" — then print it.
@@ -60,13 +61,15 @@ export function KotPrintModal({
         open={open}
         onClose={onClose}
         title={`KOT ${kot.kotId} · Table ${kot.tableCode}`}
-        description="This is exactly what the printer will produce. Items and quantities only — no prices go to the kitchen."
+        description="This is exactly what the printer will produce. Items and quantities only, no prices go to the kitchen."
         footer={
           <>
             <Button variant="secondary" onClick={onClose}>
               Close
             </Button>
-            <Button onClick={() => setPrinting(true)}>
+            {/* System mode mounts the sheet and prints the page; a direct
+                mode sends this same ticket to the printer instead. */}
+            <Button onClick={() => printDocument({ kind: 'kot', kot }, () => setPrinting(true))}>
               <IconPrint aria-hidden className="mr-1.5 inline size-4" /> Print KOT
             </Button>
           </>

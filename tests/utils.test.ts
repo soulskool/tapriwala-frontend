@@ -130,7 +130,7 @@ describe('formatClockWithDay', () => {
   });
 
   it('returns a dash for a missing or unparseable timestamp', () => {
-    expect(formatClockWithDay(null)).toBe('—');
-    expect(formatClockWithDay('not a date')).toBe('—');
+    expect(formatClockWithDay(null)).toBe('-');
+    expect(formatClockWithDay('not a date')).toBe('-');
   });
 });

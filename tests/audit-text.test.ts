@@ -69,9 +69,7 @@ describe('describeAudit', () => {
         },
       }),
     );
-    expect(text).toBe(
-      'Guest at M4 ordered 1 × Filter Coffee, 2 × Bun Maska on M4 — KOT 1116, ₹452',
-    );
+    expect(text).toBe('Guest at M4 ordered 1 × Filter Coffee, 2 × Bun Maska on M4: KOT 1116, ₹452');
   });
 
   it('tells a paid close from a table freed without a bill', () => {
@@ -87,7 +85,7 @@ describe('describeAudit', () => {
     const walkout = describeAudit(
       entry({ action: 'session.closed', meta: { billingExportId: null, itemsWrittenOff: 2 } }),
     );
-    expect(walkout.text).toBe('Sumanth freed M4 without a bill — 2 items written off');
+    expect(walkout.text).toBe('Sumanth freed M4 without a bill, 2 items written off');
   });
 
   it('reads the bill request and the bill itself', () => {
@@ -100,7 +98,7 @@ describe('describeAudit', () => {
     expect(
       describeAudit(entry({ action: 'billing.exported', after: { billNumber: 123, total: 452 } }))
         .text,
-    ).toBe('Sumanth generated bill #123 for M4 — ₹452');
+    ).toBe('Sumanth generated bill #123 for M4: ₹452');
   });
 
   it('says what changed on a staff account', () => {

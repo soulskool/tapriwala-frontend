@@ -21,21 +21,22 @@ import { formatDateTime } from '@/lib/utils';
  * 32 characters, matching the receipt — same 80mm roll, same printer.
  *
  * A hard limit, not a target: one character over and the printer wraps the
- * line, which turns a tidy column of quantities into two ragged ones.
+ * line, which turns a tidy column of quantities into two ragged ones. The
+ * direct-to-printer path asks for its own width (48 for Font A on 80mm); the
+ * HTML sheet always uses this one.
  */
-const WIDTH = 32;
+export const KOT_WIDTH = 32;
 
 /** Name takes what is left after the quantity column, plus one space of gutter. */
 const QTY_COLUMN = 5;
-const NAME_COLUMN = WIDTH - QTY_COLUMN;
 
-function rule(char = '-'): string {
-  return char.repeat(WIDTH);
+function rule(width: number, char = '-'): string {
+  return char.repeat(width);
 }
 
-function centre(text: string): string {
-  const trimmed = text.slice(0, WIDTH);
-  return ' '.repeat(Math.max(0, Math.floor((WIDTH - trimmed.length) / 2))) + trimmed;
+function centre(width: number, text: string): string {
+  const trimmed = text.slice(0, width);
+  return ' '.repeat(Math.max(0, Math.floor((width - trimmed.length) / 2))) + trimmed;
 }
 
 /** Splits a long dish name across lines instead of letting the printer truncate it. */
@@ -80,10 +81,10 @@ function wrap(text: string, width: number): string[] {
  * right: trailing spaces buy no alignment on a monospace roll and some
  * printers advance on them.
  */
-function itemRows(name: string, quantity: number): string[] {
-  const [first, ...rest] = wrap(name, NAME_COLUMN - 1);
+function itemRows(nameColumn: number, name: string, quantity: number): string[] {
+  const [first, ...rest] = wrap(name, nameColumn - 1);
   return [
-    (first ?? '').padEnd(NAME_COLUMN) + String(quantity).padStart(QTY_COLUMN),
+    (first ?? '').padEnd(nameColumn) + String(quantity).padStart(QTY_COLUMN),
     ...rest.map((line) => `  ${line}`),
   ];
 }
@@ -141,7 +142,9 @@ export function kotFromRound(round: OrderRound): KotData {
  * sheet are literally the same characters — a preview that renders through a
  * different code path is a preview that can lie.
  */
-export function buildKotText(kot: KotData): string {
+export function buildKotText(kot: KotData, width: number = KOT_WIDTH): string {
+  const nameColumn = width - QTY_COLUMN;
+
   /*
    * Cancelled items are left off the list on purpose.
    *
@@ -156,41 +159,41 @@ export function buildKotText(kot: KotData): string {
   const totalQuantity = live.reduce((sum, item) => sum + item.quantity, 0);
 
   const lines: string[] = [
-    rule('='),
-    centre(`*** ${ORDER_TYPE_LABEL[kot.orderType].toUpperCase()} ***`),
-    rule('='),
+    rule(width, '='),
+    centre(width, `*** ${ORDER_TYPE_LABEL[kot.orderType].toUpperCase()} ***`),
+    rule(width, '='),
     // An add-on goes above the fold: the kitchen has to know this is extra
     // work for a table already eating, not a fresh cover.
-    ...(kot.isAddOn ? [centre(`ADD-ON  ROUND ${kot.roundNumber}`), rule()] : []),
+    ...(kot.isAddOn ? [centre(width, `ADD-ON  ROUND ${kot.roundNumber}`), rule(width)] : []),
     `KOT     : ${kot.kotId}`,
     `TABLE   : ${kot.tableCode}`,
     `TIME    : ${formatDateTime(kot.placedAt)}`,
     ...(kot.placedByName ? [`SERVER  : ${kot.placedByName}`] : []),
-    rule(),
-    'ITEM'.padEnd(NAME_COLUMN) + 'QTY'.padStart(QTY_COLUMN),
-    rule(),
+    rule(width),
+    'ITEM'.padEnd(nameColumn) + 'QTY'.padStart(QTY_COLUMN),
+    rule(width),
   ];
 
   for (const item of live) {
-    lines.push(...itemRows(item.displayName, item.quantity));
+    lines.push(...itemRows(nameColumn, item.displayName, item.quantity));
     // Notes are indented and marked so they can never read as another dish.
     if (item.specialInstructions) {
       lines.push(
-        ...wrap(`* ${item.specialInstructions}`, NAME_COLUMN - 2).map((note) => `  ${note}`),
+        ...wrap(`* ${item.specialInstructions}`, nameColumn - 2).map((note) => `  ${note}`),
       );
     }
   }
 
   lines.push(
-    rule(),
-    'TOTAL ITEMS'.padEnd(NAME_COLUMN) + String(totalQuantity).padStart(QTY_COLUMN),
+    rule(width),
+    'TOTAL ITEMS'.padEnd(nameColumn) + String(totalQuantity).padStart(QTY_COLUMN),
   );
 
   if (cancelledCount > 0) {
-    lines.push(rule(), centre(`${cancelledCount} ITEM(S) CANCELLED`));
+    lines.push(rule(width), centre(width, `${cancelledCount} ITEM(S) CANCELLED`));
   }
 
-  lines.push(rule('='));
+  lines.push(rule(width, '='));
   return lines.join('\n');
 }
 

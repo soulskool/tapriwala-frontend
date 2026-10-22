@@ -78,7 +78,7 @@ export default function HomePage() {
       </div>
 
       <p className="text-ink-muted text-center text-sm">
-        Guests scan the QR sticker on their table — no sign-in needed.
+        Guests scan the QR sticker on their table. No sign-in needed.
       </p>
     </main>
   );

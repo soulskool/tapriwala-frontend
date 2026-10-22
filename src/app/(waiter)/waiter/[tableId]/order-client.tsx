@@ -147,7 +147,7 @@ export function TableOrderClient({ tableId }: { tableId: string }) {
     } catch (error) {
       // Loud and sticky: a waiter must never walk away believing an order went
       // through when it did not.
-      dispatch(toastPushed(apiErrorMessage(error, 'Order NOT sent — try again'), 'error'));
+      dispatch(toastPushed(apiErrorMessage(error, 'Order NOT sent. Try again'), 'error'));
     }
   }
 
@@ -194,7 +194,7 @@ export function TableOrderClient({ tableId }: { tableId: string }) {
   async function handleRequestBill() {
     try {
       await raiseRequest({ tableId, type: SERVICE_REQUEST_TYPE.BILL }).unwrap();
-      dispatch(toastPushed('Bill requested — the counter has been told', 'success'));
+      dispatch(toastPushed('Bill requested. The counter has been told', 'success'));
     } catch (error) {
       dispatch(toastPushed(apiErrorMessage(error, 'Could not request the bill'), 'error'));
     }
@@ -221,7 +221,7 @@ export function TableOrderClient({ tableId }: { tableId: string }) {
       await closeSession({
         sessionId,
         force: true,
-        note: `Freed without billing — ${freeReason.trim() || 'nothing was ordered'}`,
+        note: `Freed without billing: ${freeReason.trim() || 'nothing was ordered'}`,
       }).unwrap();
 
       dispatch(toastPushed(`${tile?.code ?? 'Table'} is free`, 'success'));
@@ -462,7 +462,7 @@ export function TableOrderClient({ tableId }: { tableId: string }) {
         open={freeOpen}
         onClose={() => setFreeOpen(false)}
         title={`Free ${tile.code} without billing?`}
-        description="Use this when nobody is at the table — an order placed from a copied QR link, a session opened by mistake, or a group that left."
+        description="Use this when nobody is at the table: an order placed from a copied QR link, a session opened by mistake, or a group that left."
         size="sm"
         footer={
           <>
@@ -514,14 +514,14 @@ export function TableOrderClient({ tableId }: { tableId: string }) {
             value={freeReason}
             onChange={(event) => setFreeReason(event.target.value)}
             placeholder={
-              needsFreeReason ? 'e.g. fake order, nobody at the table' : 'Optional — tidying up'
+              needsFreeReason ? 'e.g. fake order, nobody at the table' : 'Optional, tidying up'
             }
             hint="Recorded against your name in the audit log, with the amount written off."
           />
 
           <p className="text-ink-muted text-xs">
-            Nothing is deleted — the session and its orders stay in the history. The table just
-            stops being live, so the next guest starts fresh.
+            Nothing is deleted. The session and its orders stay in the history. The table just stops
+            being live, so the next guest starts fresh.
           </p>
         </div>
       </Modal>

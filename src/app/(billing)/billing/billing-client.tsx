@@ -189,7 +189,7 @@ function BillingQueueCard({ entry }: { entry: BillingQueueEntry }) {
         {entry.heldForReview ? (
           <p className="bg-status-pending-soft text-status-pending-ink rounded-lg px-2.5 py-1.5 text-sm font-medium">
             <IconWarning aria-hidden className="mr-1 inline size-4" /> Held for review
-            {entry.reviewNote ? ` — ${entry.reviewNote}` : ''}
+            {entry.reviewNote ? `: ${entry.reviewNote}` : ''}
           </p>
         ) : null}
       </Link>

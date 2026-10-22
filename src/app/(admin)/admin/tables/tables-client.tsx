@@ -240,7 +240,7 @@ export function TablesClient() {
         open={sheetOpen}
         onClose={() => setSheetOpen(false)}
         title="QR sheet"
-        description="One URL per table, built from its code. Print these onto the table stickers — reprinting is the whole recovery story if one is damaged."
+        description="One URL per table, built from its code. Print these onto the table stickers. Reprinting is the whole recovery story if one is damaged."
         size="lg"
         footer={
           <Button variant="secondary" onClick={() => window.print()}>

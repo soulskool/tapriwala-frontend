@@ -28,7 +28,7 @@ export function BillSummary({ bill }: { bill: ConsolidatedBill }) {
             is not. */}
         <Row
           label="Order type"
-          value={bill.orderTypes.map((type) => ORDER_TYPE_LABEL[type]).join(' + ') || '—'}
+          value={bill.orderTypes.map((type) => ORDER_TYPE_LABEL[type]).join(' + ') || '-'}
         />
         <Row label={`Subtotal (${bill.itemCount} items)`} value={formatCurrency(bill.subtotal)} />
         <Row label="Tax" value={formatCurrency(bill.tax)} />

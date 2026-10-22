@@ -5,11 +5,12 @@ import { useMemo, useState } from 'react';
 
 import { IconBill, IconCheck, IconDownload, IconPrint, IconWarning } from '@/components/ui/icons';
 import { ExportBillsModal } from '@/components/billing/export-bills-modal';
-import { ReceiptSheet } from '@/components/billing/receipt-sheet';
+import { ReceiptSheet, type ReceiptData } from '@/components/billing/receipt-sheet';
 import { Button } from '@/components/ui/button';
 import { EmptyState, ErrorState, LoadingBlock } from '@/components/ui/feedback';
 import { TextField } from '@/components/ui/field';
 import { EXPORT_STATUS, ROLES } from '@/lib/constants';
+import { printDocument } from '@/lib/print/print-document';
 import type { BillingExport } from '@/lib/types';
 import { cn, formatBillTotal, formatClock, formatDateTime, groupBy } from '@/lib/utils';
 import { apiErrorMessage } from '@/store/api/base-query';
@@ -65,12 +66,31 @@ export function CompletedBills() {
   const canExport = canAccess(user, [ROLES.BILLING]);
   const [exportOpen, setExportOpen] = useState(false);
 
+  /**
+   * Reprints a saved bill — through the browser's dialog or straight to the
+   * printer, whichever this device is set to (`printDocument`). On the direct
+   * path the hidden sheet is never mounted at all.
+   */
   function handlePrint(bill: BillingExport) {
-    setPrinting(bill);
-    setPrintedAt(new Date().toISOString());
-    // Two frames: one for React to paint the receipt, one for the browser to
-    // lay it out before `print()` freezes the page on it.
-    requestAnimationFrame(() => requestAnimationFrame(() => window.print()));
+    const now = new Date().toISOString();
+    printDocument(
+      {
+        kind: 'receipt',
+        receipt: {
+          bill: receiptOf(bill),
+          billNumber: bill.billNumber,
+          printedAt: now,
+          isReprint: true,
+        },
+      },
+      () => {
+        setPrinting(bill);
+        setPrintedAt(now);
+        // Two frames: one for React to paint the receipt, one for the browser
+        // to lay it out before `print()` freezes the page on it.
+        requestAnimationFrame(() => requestAnimationFrame(() => window.print()));
+      },
+    );
   }
 
   // Server-side filter so "M2" searches every bill ever, not just this page.
@@ -108,14 +128,7 @@ export function CompletedBills() {
        */}
       {printing ? (
         <ReceiptSheet
-          bill={{
-            tableCode: printing.tableCode,
-            lines: printing.lineItems,
-            subtotal: printing.subtotal,
-            tax: printing.tax,
-            roundOff: printing.roundOff ?? 0,
-            total: printing.total,
-          }}
+          bill={receiptOf(printing)}
           billNumber={printing.billNumber}
           printedAt={printedAt ?? printing.generatedAt}
           isReprint
@@ -201,6 +214,18 @@ export function CompletedBills() {
       <ExportBillsModal open={exportOpen} onClose={() => setExportOpen(false)} />
     </>
   );
+}
+
+/** A saved bill as the receipt's shape — one mapping for both print paths. */
+function receiptOf(bill: BillingExport): ReceiptData {
+  return {
+    tableCode: bill.tableCode,
+    lines: bill.lineItems,
+    subtotal: bill.subtotal,
+    tax: bill.tax,
+    roundOff: bill.roundOff ?? 0,
+    total: bill.total,
+  };
 }
 
 /** Threaded down rather than put in a context — it is two levels, not ten. */
@@ -313,7 +338,7 @@ function PaidStatus({ bill }: { bill: BillingExport }) {
       </span>
     );
   }
-  return <span className="text-ink-muted text-sm">— Not settled</span>;
+  return <span className="text-ink-muted text-sm">Not settled</span>;
 }
 
 /** Reprints a stored bill. Everything it prints came with the list. */
@@ -332,7 +357,7 @@ function PrintButton({ bill, onPrint }: { bill: BillingExport; onPrint: () => vo
 
 /** "3 Sep" — the day only; the clock time gets its own column. */
 function dayOf(iso: string): string {
-  return formatDateTime(iso).split(',')[0] ?? '—';
+  return formatDateTime(iso).split(',')[0] ?? '-';
 }
 
 function BillRow({

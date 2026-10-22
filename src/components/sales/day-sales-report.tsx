@@ -136,7 +136,7 @@ function DayRow({ row, isToday }: { row: DailySalesRow; isToday: boolean }) {
       </th>
       {empty ? (
         <td colSpan={5} className="text-ink-muted px-3 py-2 text-right">
-          — no paid bills
+          No paid bills
         </td>
       ) : (
         <>

@@ -24,6 +24,7 @@ import { useState } from 'react';
 import { Button } from '@/components/ui/button';
 import { ConnectionDot } from '@/components/ui/connection-dot';
 import { Modal } from '@/components/ui/modal';
+import { PrinterReconnectBanner, PrinterStatusChip } from '@/components/printer/printer-status';
 import { ROLES, ROLE_LABEL, type Role } from '@/lib/constants';
 import { cn, initials } from '@/lib/utils';
 import { useSignOut } from '@/hooks/use-sign-out';
@@ -165,6 +166,8 @@ export function RoleHeader({ title, confirmSignOut = false }: RoleHeaderProps) {
 
         <ConnectionDot className="text-ink-muted hidden sm:inline-flex" />
 
+        <PrinterStatusChip className="hidden sm:inline-flex" />
+
         {user ? (
           <div className="flex items-center gap-2">
             <span
@@ -216,8 +219,9 @@ export function RoleHeader({ title, confirmSignOut = false }: RoleHeaderProps) {
             ))}
           </ul>
 
-          <div className="border-line mt-2 flex items-center justify-between gap-2 border-t pt-2">
+          <div className="border-line mt-2 flex flex-wrap items-center justify-between gap-2 border-t pt-2">
             <ConnectionDot className="text-ink-muted" />
+            <PrinterStatusChip />
             <button
               type="button"
               onClick={confirmSignOut ? () => setConfirmOpen(true) : () => void signOut()}
@@ -230,11 +234,13 @@ export function RoleHeader({ title, confirmSignOut = false }: RoleHeaderProps) {
         </nav>
       ) : null}
 
+      <PrinterReconnectBanner />
+
       <Modal
         open={confirmOpen}
         onClose={() => setConfirmOpen(false)}
         title="Sign out of this device?"
-        description="Nothing in progress is lost — orders and tickets live on the server. The next person signs in with their own PIN, so their taps are logged against them."
+        description="Nothing in progress is lost. Orders and tickets live on the server. The next person signs in with their own PIN, so their taps are logged against them."
         size="sm"
         footer={
           <>

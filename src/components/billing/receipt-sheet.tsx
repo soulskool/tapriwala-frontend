@@ -6,7 +6,9 @@ import { formatDateTime } from '@/lib/utils';
  *
  * Hidden on screen and revealed only by `@media print` (see `globals.css`),
  * which is why it is a plain Server Component with no state: printing it is
- * `window.print()` on the page that already has the bill.
+ * `window.print()` on the page that already has the bill. A device set to
+ * print directly (Bluetooth / RawBT — see `lib/print/`) skips this sheet and
+ * sends `buildReceiptText` at the printer's own width instead.
  *
  * **Whether this is a tax invoice is decided by one env var.** Set
  * `NEXT_PUBLIC_SHOP_GSTIN` and the header prints the GSTIN and the paper calls
@@ -41,42 +43,93 @@ const SHOP = {
 /**
  * Receipt columns are counted in characters, not pixels.
  *
- * 32 is a hard limit: one character over and the printer runs the line off the
- * edge of the roll — it does not wrap or shrink to fit, it simply stops, and
- * you find out on paper in front of a guest. Every row below is built from
- * ITEM_COLUMNS so the header can never drift out of step with the rows.
+ * 32 is a hard limit for the HTML sheet: one character over and the printer
+ * runs the line off the edge of the roll — it does not wrap or shrink to fit,
+ * it simply stops, and you find out on paper in front of a guest. Every row
+ * below is built from the column grid so the header can never drift out of
+ * step with the rows.
  *
  * The matching half of this contract is the print font size in `globals.css`,
  * which is derived from this number and the roll width. Changing 32 without
  * redoing that arithmetic prints a truncated bill.
+ *
+ * The direct-to-printer path (Bluetooth / RawBT, `lib/print/`) asks for a
+ * wider sheet — 48 characters is Font A across 80mm — and gets the same
+ * builder at that width. The 32-column sheet is what the Windows counter
+ * prints through the browser, and it stays exactly what it was.
  */
-const WIDTH = 32;
+export const RECEIPT_WIDTH = 32;
 
-const ITEM_COLUMNS = { name: 14, qty: 3, rate: 7, amount: 8 } as const;
+interface ReceiptGrid {
+  width: number;
+  item: { name: number; qty: number; rate: number; amount: number };
+  tax: { rate: number; taxable: number; cgst: number; sgst: number };
+}
 
-function rule(char = '-'): string {
-  return char.repeat(WIDTH);
+/**
+ * The column grid for a given paper width.
+ *
+ * 32 is the historical grid, frozen character for character. Anything wider
+ * gives the extra room to the numbers first — at 32 a ₹8080 rate on a
+ * five-figure line runs its columns together — and the rest to the name.
+ */
+function gridFor(width: number): ReceiptGrid {
+  if (width <= RECEIPT_WIDTH) {
+    return {
+      width,
+      item: { name: 14, qty: 3, rate: 7, amount: 8 },
+      tax: { rate: 6, taxable: 10, cgst: 8, sgst: 8 },
+    };
+  }
+  return {
+    width,
+    item: { name: width - 24, qty: 5, rate: 9, amount: 10 },
+    tax: { rate: width - 36, taxable: 12, cgst: 12, sgst: 12 },
+  };
+}
+
+function rule(grid: ReceiptGrid, char = '-'): string {
+  return char.repeat(grid.width);
 }
 
 /** Lays one item row (or the header) into the fixed column grid. */
-function itemRow(name: string, qty: string, rate: string, amount: string): string {
+function itemRow(
+  grid: ReceiptGrid,
+  name: string,
+  qty: string,
+  rate: string,
+  amount: string,
+): string {
+  const columns = grid.item;
   return (
-    name.slice(0, ITEM_COLUMNS.name).padEnd(ITEM_COLUMNS.name) +
-    qty.padStart(ITEM_COLUMNS.qty) +
-    rate.padStart(ITEM_COLUMNS.rate) +
-    amount.padStart(ITEM_COLUMNS.amount)
+    name.slice(0, columns.name).padEnd(columns.name) +
+    qty.padStart(columns.qty) +
+    rate.padStart(columns.rate) +
+    amount.padStart(columns.amount)
   );
 }
 
-/** The tax-summary grid at the foot of the receipt. Also 32 characters wide. */
-function taxRow(rate: string, taxable: string, cgst: string, sgst: string): string {
-  return rate.padEnd(6) + taxable.padStart(10) + cgst.padStart(8) + sgst.padStart(8);
+/** The tax-summary grid at the foot of the receipt. The full paper width. */
+function taxRow(
+  grid: ReceiptGrid,
+  rate: string,
+  taxable: string,
+  cgst: string,
+  sgst: string,
+): string {
+  const columns = grid.tax;
+  return (
+    rate.padEnd(columns.rate) +
+    taxable.padStart(columns.taxable) +
+    cgst.padStart(columns.cgst) +
+    sgst.padStart(columns.sgst)
+  );
 }
 
 /** Centres a line without letting a long one push past the paper edge. */
-function centre(text: string): string {
-  const trimmed = text.slice(0, WIDTH);
-  return ' '.repeat(Math.max(0, Math.floor((WIDTH - trimmed.length) / 2))) + trimmed;
+function centre(grid: ReceiptGrid, text: string): string {
+  const trimmed = text.slice(0, grid.width);
+  return ' '.repeat(Math.max(0, Math.floor((grid.width - trimmed.length) / 2))) + trimmed;
 }
 
 /** Right-aligns money in a fixed column so the decimal points line up. */
@@ -149,7 +202,30 @@ export interface ReceiptSheetProps {
   isReprint?: boolean;
 }
 
-export function ReceiptSheet({ bill, billNumber, printedAt, isReprint }: ReceiptSheetProps) {
+/** One receipt as text, split where the HTML sheet changes element. */
+export interface ReceiptText {
+  /** Shop header down to the totals block, `\n`-separated. */
+  body: string;
+  /** The NET TOTAL figure alone — set larger than the grid on both paths. */
+  netTotal: string;
+  /** Tax summary and footer, `\n`-separated. */
+  foot: string;
+}
+
+/**
+ * Builds the receipt as text at a given paper width.
+ *
+ * Pulled out of the JSX so the browser sheet and the direct-to-printer bytes
+ * (`lib/print/`) are the same characters from one code path — at 32 columns
+ * this is exactly what the HTML sheet has always rendered, which is pinned by
+ * `tests/print-golden.json`.
+ */
+export function buildReceiptText(
+  { bill, billNumber, printedAt, isReprint }: ReceiptSheetProps,
+  width: number = RECEIPT_WIDTH,
+): ReceiptText {
+  const grid = gridFor(width);
+
   // One row per tax rate, matching how the café's own POS prints it. Grouped
   // rather than assumed to be a single 5% because the item sheet genuinely
   // contains more than one rate.
@@ -184,82 +260,91 @@ export function ReceiptSheet({ bill, billNumber, printedAt, isReprint }: Receipt
    */
   const isMixed = types.length > 1;
 
+  const head = [
+    centre(grid, SHOP.name.toUpperCase()),
+    centre(grid, SHOP.addressLine1),
+    centre(grid, SHOP.addressLine2),
+    SHOP.phone ? centre(grid, `PH: ${SHOP.phone}`) : '',
+    SHOP.gstin ? centre(grid, `GSTIN : ${SHOP.gstin}`) : '',
+    '',
+    // A reprint must always announce itself, whichever kind of paper it
+    // is — the guest and the counter both need to know this is a second
+    // copy of one sale, not a second sale.
+    centre(grid, isReprint ? 'DUPLICATE BILL' : SHOP.gstin ? 'TAX INVOICE' : 'CUSTOMER COPY'),
+    isReprint && SHOP.gstin ? centre(grid, 'TAX INVOICE') : '',
+    rule(grid, '='),
+    `TABLE   : ${bill.tableCode}`,
+    `TYPE    : ${types.map((type) => ORDER_TYPE_LABEL[type].toUpperCase()).join(' + ')}`,
+    bill.sessionNumber ? `SESSION : ${bill.sessionNumber}` : '',
+    billNumber ? `BILL NO : ${billNumber}` : 'BILL NO : (not generated)',
+    `DATE    : ${formatDateTime(printedAt)}`,
+    rule(grid),
+    itemRow(grid, 'ITEM', 'QTY', 'RATE', 'TOTAL'),
+    rule(grid),
+  ].filter((row) => row.trim() !== '');
+
+  const items = bill.lines.map((line) =>
+    // The POS name, not the pretty menu name: this is the line the
+    // counter has to reconcile against the software's own bill.
+    itemRow(
+      grid,
+      isMixed && (line.orderType ?? ORDER_TYPE.DINING) === ORDER_TYPE.PARCEL
+        ? `*${line.posName}`
+        : line.posName,
+      String(line.quantity),
+      money(line.unitPrice),
+      money(line.amount),
+    ),
+  );
+
+  const totals = [
+    // The key for the per-line marker, printed only when there is one.
+    ...(isMixed ? [`* = ${ORDER_TYPE_LABEL[ORDER_TYPE.PARCEL].toUpperCase()}`] : []),
+    rule(grid),
+    `SUBTOTAL${money(bill.subtotal).padStart(width - 8)}`,
+    `TAX  (+)${money(bill.tax).padStart(width - 8)}`,
+    // Signed, so SUBTOTAL + TAX + ROUND OFF visibly equals NET TOTAL.
+    // Left off entirely when there is none, as on every old bill.
+    ...(bill.roundOff ? [`ROUND OFF${signedMoney(bill.roundOff).padStart(width - 9)}`] : []),
+    rule(grid, '='),
+  ];
+
+  const foot = [
+    rule(grid),
+    taxRow(grid, 'TAX%', 'TAXABLE', 'CGST', 'SGST'),
+    ...rates.map(([rate, { taxable, tax }]) =>
+      // Half to CGST, half to SGST — the same split the café's own POS
+      // prints, so the two receipts read alike when a guest holds both.
+      taxRow(grid, money(rate), money(taxable), money(tax / 2), money(tax / 2)),
+    ),
+    rule(grid),
+    '',
+    centre(grid, SHOP.footer),
+  ];
+
+  return {
+    // Three joins glued with newlines, exactly as the sheet's three JSX
+    // children were — an empty bill keeps its blank line.
+    body: `${head.join('\n')}\n${items.join('\n')}\n${totals.join('\n')}`,
+    // Whole rupees, no ".00" — see `netTotal`.
+    netTotal: netTotal(bill.total),
+    foot: foot.join('\n'),
+  };
+}
+
+export function ReceiptSheet(props: ReceiptSheetProps) {
+  const text = buildReceiptText(props);
+
   return (
     <div className="receipt-sheet" aria-hidden>
-      <pre className="receipt-body">
-        {[
-          centre(SHOP.name.toUpperCase()),
-          centre(SHOP.addressLine1),
-          centre(SHOP.addressLine2),
-          SHOP.phone ? centre(`PH: ${SHOP.phone}`) : '',
-          SHOP.gstin ? centre(`GSTIN : ${SHOP.gstin}`) : '',
-          '',
-          // A reprint must always announce itself, whichever kind of paper it
-          // is — the guest and the counter both need to know this is a second
-          // copy of one sale, not a second sale.
-          centre(isReprint ? 'DUPLICATE BILL' : SHOP.gstin ? 'TAX INVOICE' : 'CUSTOMER COPY'),
-          isReprint && SHOP.gstin ? centre('TAX INVOICE') : '',
-          rule('='),
-          `TABLE   : ${bill.tableCode}`,
-          `TYPE    : ${types.map((type) => ORDER_TYPE_LABEL[type].toUpperCase()).join(' + ')}`,
-          bill.sessionNumber ? `SESSION : ${bill.sessionNumber}` : '',
-          billNumber ? `BILL NO : ${billNumber}` : 'BILL NO : (not generated)',
-          `DATE    : ${formatDateTime(printedAt)}`,
-          rule(),
-          itemRow('ITEM', 'QTY', 'RATE', 'TOTAL'),
-          rule(),
-        ]
-          .filter((row) => row.trim() !== '')
-          .join('\n')}
-        {'\n'}
-        {bill.lines
-          .map((line) =>
-            // The POS name, not the pretty menu name: this is the line the
-            // counter has to reconcile against the software's own bill.
-            itemRow(
-              isMixed && (line.orderType ?? ORDER_TYPE.DINING) === ORDER_TYPE.PARCEL
-                ? `*${line.posName}`
-                : line.posName,
-              String(line.quantity),
-              money(line.unitPrice),
-              money(line.amount),
-            ),
-          )
-          .join('\n')}
-        {'\n'}
-        {[
-          // The key for the per-line marker, printed only when there is one.
-          ...(isMixed ? [`* = ${ORDER_TYPE_LABEL[ORDER_TYPE.PARCEL].toUpperCase()}`] : []),
-          rule(),
-          `SUBTOTAL${money(bill.subtotal).padStart(WIDTH - 8)}`,
-          `TAX  (+)${money(bill.tax).padStart(WIDTH - 8)}`,
-          // Signed, so SUBTOTAL + TAX + ROUND OFF visibly equals NET TOTAL.
-          // Left off entirely when there is none, as on every old bill.
-          ...(bill.roundOff ? [`ROUND OFF${signedMoney(bill.roundOff).padStart(WIDTH - 9)}`] : []),
-          rule('='),
-        ].join('\n')}
-      </pre>
+      <pre className="receipt-body">{text.body}</pre>
 
       <p className="receipt-total">
         <span>NET TOTAL</span>
-        {/* Whole rupees, no ".00" — see `netTotal`. */}
-        <span>{netTotal(bill.total)}</span>
+        <span>{text.netTotal}</span>
       </p>
 
-      <pre className="receipt-body">
-        {[
-          rule(),
-          taxRow('TAX%', 'TAXABLE', 'CGST', 'SGST'),
-          ...rates.map(([rate, { taxable, tax }]) =>
-            // Half to CGST, half to SGST — the same split the café's own POS
-            // prints, so the two receipts read alike when a guest holds both.
-            taxRow(money(rate), money(taxable), money(tax / 2), money(tax / 2)),
-          ),
-          rule(),
-          '',
-          centre(SHOP.footer),
-        ].join('\n')}
-      </pre>
+      <pre className="receipt-body">{text.foot}</pre>
     </div>
   );
 }

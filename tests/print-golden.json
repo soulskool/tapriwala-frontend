@@ -1,0 +1,39 @@
+{
+  "live": {
+    "pres": [
+      "    TAPRIWALA BY TREATMEETS\n         CUSTOMER COPY\n================================\nTABLE   : O3\nTYPE    : DINING\nSESSION : 7\nBILL NO : 1234\nDATE    : {{DATE}}\n--------------------------------\nITEM          QTY   RATE   TOTAL\n--------------------------------\nTW CUTT TEA     2  25.00   50.00\nPANEER TIKKA S  1 180.00  180.00\nWATER           1  20.00   20.00\n--------------------------------\nSUBTOTAL                  250.00\nTAX  (+)                   11.50\nROUND OFF                  +0.50\n================================",
+      "--------------------------------\nTAX%     TAXABLE    CGST    SGST\n0.00       20.00    0.00    0.00\n5.00      230.00    5.75    5.75\n--------------------------------\n\n    THANK YOU ! VISIT AGAIN"
+    ],
+    "total": "NET TOTAL262"
+  },
+  "reprintMixed": {
+    "pres": [
+      "    TAPRIWALA BY TREATMEETS\n         DUPLICATE BILL\n================================\nTABLE   : M2\nTYPE    : DINING + PARCEL\nBILL NO : 98765\nDATE    : {{DATE}}\n--------------------------------\nITEM          QTY   RATE   TOTAL\n--------------------------------\nTW CUTT TEA     2  25.00   50.00\n*JAIN CHESSE F 128080.0096960.00\n* = PARCEL\n--------------------------------\nSUBTOTAL                97010.00\nTAX  (+)                 4850.50\nROUND OFF                  -0.50\n================================",
+      "--------------------------------\nTAX%     TAXABLE    CGST    SGST\n5.00    97010.00 2425.25 2425.25\n--------------------------------\n\n    THANK YOU ! VISIT AGAIN"
+    ],
+    "total": "NET TOTAL101860"
+  },
+  "legacy": {
+    "pres": [
+      "    TAPRIWALA BY TREATMEETS\n         CUSTOMER COPY\n================================\nTABLE   : R1\nTYPE    : DINING\nBILL NO : (not generated)\nDATE    : {{DATE}}\n--------------------------------\nITEM          QTY   RATE   TOTAL\n--------------------------------\nTW CUTT TEA     2  25.00   50.00\n--------------------------------\nSUBTOTAL                   50.00\nTAX  (+)                    2.50\n================================",
+      "--------------------------------\nTAX%     TAXABLE    CGST    SGST\n5.00       50.00    1.25    1.25\n--------------------------------\n\n    THANK YOU ! VISIT AGAIN"
+    ],
+    "total": "NET TOTAL52.50"
+  },
+  "gst_live": {
+    "pres": [
+      "    TAPRIWALA BY TREATMEETS\n         PH: 9876543210\n    GSTIN : 27ABCDE1234F1Z5\n          TAX INVOICE\n================================\nTABLE   : O3\nTYPE    : DINING\nSESSION : 7\nBILL NO : 1234\nDATE    : {{DATE}}\n--------------------------------\nITEM          QTY   RATE   TOTAL\n--------------------------------\nTW CUTT TEA     2  25.00   50.00\nPANEER TIKKA S  1 180.00  180.00\nWATER           1  20.00   20.00\n--------------------------------\nSUBTOTAL                  250.00\nTAX  (+)                   11.50\nROUND OFF                  +0.50\n================================",
+      "--------------------------------\nTAX%     TAXABLE    CGST    SGST\n0.00       20.00    0.00    0.00\n5.00      230.00    5.75    5.75\n--------------------------------\n\n    THANK YOU ! VISIT AGAIN"
+    ],
+    "total": "NET TOTAL262"
+  },
+  "gst_reprintMixed": {
+    "pres": [
+      "    TAPRIWALA BY TREATMEETS\n         PH: 9876543210\n    GSTIN : 27ABCDE1234F1Z5\n         DUPLICATE BILL\n          TAX INVOICE\n================================\nTABLE   : M2\nTYPE    : DINING + PARCEL\nBILL NO : 98765\nDATE    : {{DATE}}\n--------------------------------\nITEM          QTY   RATE   TOTAL\n--------------------------------\nTW CUTT TEA     2  25.00   50.00\n*JAIN CHESSE F 128080.0096960.00\n* = PARCEL\n--------------------------------\nSUBTOTAL                97010.00\nTAX  (+)                 4850.50\nROUND OFF                  -0.50\n================================",
+      "--------------------------------\nTAX%     TAXABLE    CGST    SGST\n5.00    97010.00 2425.25 2425.25\n--------------------------------\n\n    THANK YOU ! VISIT AGAIN"
+    ],
+    "total": "NET TOTAL101860"
+  },
+  "kot_addOn": "================================\n         *** PARCEL ***\n================================\n        ADD-ON  ROUND 2\n--------------------------------\nKOT     : 1051\nTABLE   : M2\nTIME    : {{DATE}}\nSERVER  : Ravi\n--------------------------------\nITEM                         QTY\n--------------------------------\nPlain Tea Cutting              2\n  * less sugar, extra hot,\n  served in a glass please\nSupercalifragilisticexpial    12\n  idocious Masala Maggi With\n  Cheese\n--------------------------------\nTOTAL ITEMS                   14\n--------------------------------\n      1 ITEM(S) CANCELLED\n================================",
+  "kot_guestFirstRound": "================================\n         *** DINING ***\n================================\nKOT     : 1052\nTABLE   : O1\nTIME    : {{DATE}}\n--------------------------------\nITEM                         QTY\n--------------------------------\nCold Coffee                    3\n--------------------------------\nTOTAL ITEMS                    3\n================================"
+}

@@ -128,7 +128,7 @@ function ItemRow({ item, busy, onServe, onCancel }: ItemRowProps) {
           </p>
         ) : null}
         {cancelled && item.cancelReason ? (
-          <p className="text-ink-muted text-sm">cancelled — {item.cancelReason}</p>
+          <p className="text-ink-muted text-sm">cancelled: {item.cancelReason}</p>
         ) : null}
       </div>
 

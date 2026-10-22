@@ -375,7 +375,7 @@ export function ProductsClient() {
         open={editing !== null}
         onClose={() => setEditing(null)}
         title={editing?.id ? 'Edit item' : 'Add item'}
-        description="Product code is what the legacy POS matches on — it cannot be changed after items have been ordered against it."
+        description="Product code is what the legacy POS matches on. It cannot be changed after items have been ordered against it."
         footer={
           <>
             <Button variant="secondary" onClick={() => setEditing(null)}>

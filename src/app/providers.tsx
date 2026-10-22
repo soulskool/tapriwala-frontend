@@ -3,6 +3,7 @@
 import { useEffect, useState, type ReactNode } from 'react';
 import { Provider } from 'react-redux';
 
+import { PrintNoticeHost } from '@/components/printer/print-notice-host';
 import { ToastHost } from '@/components/ui/toast-host';
 import { makeStore, type AppStore } from '@/store';
 import { AUTH_EXPIRED_EVENT } from '@/store/api/base-query';
@@ -42,6 +43,7 @@ export function Providers({ children }: { children: ReactNode }) {
     <Provider store={store}>
       {children}
       <ToastHost />
+      <PrintNoticeHost />
     </Provider>
   );
 }

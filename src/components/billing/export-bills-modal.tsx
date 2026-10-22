@@ -179,7 +179,7 @@ export function ExportBillsModal({ open, onClose }: { open: boolean; onClose: ()
         ) : null}
 
         <p className="text-ink-muted text-xs">
-          Very large ranges are capped, and the sheet says so on its last row if that happens —
+          Very large ranges are capped, and the sheet says so on its last row if that happens;
           narrow the dates and export again.
         </p>
       </div>
