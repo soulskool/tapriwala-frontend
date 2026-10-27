@@ -3,7 +3,7 @@
 import Link from 'next/link';
 import { memo } from 'react';
 
-import { IconRequest } from '@/components/ui/icons';
+import { IconBillMoved, IconRequest } from '@/components/ui/icons';
 import { TILE_STATUS_STYLE } from '@/components/ui/status-pill';
 import { TILE_EMPTY } from '@/lib/constants';
 import type { LiveTableTile } from '@/lib/types';
@@ -43,6 +43,17 @@ function TableGridCellComponent({ tile }: { tile: LiveTableTile }) {
 
       <div className="flex flex-col gap-0.5">
         <span className="text-xs leading-tight font-semibold">{style.label}</span>
+
+        {/* Icon and words, not colour alone: whose bill this table is on. */}
+        {tile.billWithTableCode ? (
+          <span className="flex items-center gap-1 text-xs font-semibold">
+            <IconBillMoved aria-hidden className="size-3" /> Bill with {tile.billWithTableCode}
+          </span>
+        ) : tile.billIncludes.length > 0 ? (
+          <span className="flex items-center gap-1 text-xs font-semibold">
+            <IconBillMoved aria-hidden className="size-3" /> + {tile.billIncludes.join(', ')}
+          </span>
+        ) : null}
 
         {!isEmpty ? (
           <span className="text-xs tabular-nums opacity-80">

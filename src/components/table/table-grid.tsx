@@ -2,7 +2,6 @@
 
 import { useMemo } from 'react';
 
-import { ZONE_DISPLAY_ORDER, type TableZone } from '@/lib/constants';
 import type { LiveTableTile } from '@/lib/types';
 import { groupBy } from '@/lib/utils';
 import { TableGridCell } from './table-grid-cell';
@@ -12,20 +11,14 @@ import { TableGridCell } from './table-grid-cell';
  *
  * Zones come from the data rather than being hardcoded, so adding a table on
  * the lawn is a Table Master edit and not a frontend change. Their *order* is
- * fixed in `ZONE_DISPLAY_ORDER` because the grid should read the way the café
- * is actually arranged, and alphabetical does not.
+ * each zone's own display order, set on the admin Tables page: the server
+ * sends tiles already sorted by it, and `groupBy` keeps first-seen order.
  */
 export function TableGrid({ tiles }: { tiles: LiveTableTile[] }) {
-  const zones = useMemo(() => {
-    const grouped = groupBy(tiles, (tile) => tile.zone as TableZone);
-
-    return Array.from(grouped.entries()).sort(([a], [b]) => {
-      const orderA = ZONE_DISPLAY_ORDER.indexOf(a);
-      const orderB = ZONE_DISPLAY_ORDER.indexOf(b);
-      // A zone nobody planned for sorts last rather than jumping to the front.
-      return (orderA === -1 ? 99 : orderA) - (orderB === -1 ? 99 : orderB);
-    });
-  }, [tiles]);
+  const zones = useMemo(
+    () => Array.from(groupBy(tiles, (tile) => tile.zone || 'No zone').entries()),
+    [tiles],
+  );
 
   return (
     <div className="flex flex-col gap-6">

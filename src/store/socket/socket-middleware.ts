@@ -88,7 +88,10 @@ export const socketMiddleware: Middleware = (store) => {
 
   /** Re-reads every list a floor-wide change can touch. */
   function invalidateFloor(): void {
-    dispatch(tableApi.util.invalidateTags(['LiveGrid']));
+    // TableMaster and Zone too: a table added, moved or deleted, or a zone
+    // renamed, in another admin's tab. Only screens that hold those queries
+    // re-fetch, so the floor devices pay nothing for it.
+    dispatch(tableApi.util.invalidateTags(['LiveGrid', 'TableMaster', 'Zone']));
     dispatch(adminApi.util.invalidateTags(['Overview']));
   }
 

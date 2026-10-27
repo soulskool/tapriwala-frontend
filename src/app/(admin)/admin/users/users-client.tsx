@@ -3,6 +3,7 @@
 import { useState } from 'react';
 
 import { Button } from '@/components/ui/button';
+import { ConfirmDelete } from '@/components/ui/confirm-delete';
 import { SelectField, TextField } from '@/components/ui/field';
 import { ErrorState, LoadingBlock } from '@/components/ui/feedback';
 import { Modal } from '@/components/ui/modal';
@@ -11,6 +12,7 @@ import type { StaffUser } from '@/lib/types';
 import { cn, formatDateTime, initials } from '@/lib/utils';
 import {
   useCreateUserMutation,
+  useDeleteUserMutation,
   useListUsersQuery,
   useUpdateUserMutation,
 } from '@/store/api/admin-api';
@@ -34,8 +36,10 @@ const EMPTY_DRAFT: Draft = { name: '', phone: '', role: ROLES.WAITER, pin: '' };
  * Staff accounts.
  *
  * Devices are shared, so an account is really "who is on this device right
- * now". Deactivating is preferred over deleting: the audit trail references
- * these users, and a name that vanishes makes an old dispute unreadable.
+ * now". Deactivate is for someone who is away; Delete is for someone who has
+ * left. Delete is soft on the server: their name stays on every bill and audit
+ * row they signed, and their phone number is freed for a new hire. Nobody can
+ * delete their own account, and the last Admins account cannot be deleted.
  *
  * Every admin role reads this page; only a super admin edits it — including
  * making another admin a super admin, or taking that back. The API enforces
@@ -43,14 +47,17 @@ const EMPTY_DRAFT: Draft = { name: '', phone: '', role: ROLES.WAITER, pin: '' };
  */
 export function UsersClient() {
   const dispatch = useAppDispatch();
-  const canManage = canManageStaff(useAppSelector((state) => state.auth.user));
+  const me = useAppSelector((state) => state.auth.user);
+  const canManage = canManageStaff(me);
 
   const users = useListUsersQuery({ includeInactive: true });
   const [createUser, { isLoading: isCreating }] = useCreateUserMutation();
   const [updateUser, { isLoading: isUpdating }] = useUpdateUserMutation();
+  const [deleteUser, { isLoading: isDeleting }] = useDeleteUserMutation();
 
   const [editing, setEditing] = useState<Draft | null>(null);
   const [formError, setFormError] = useState<unknown>(null);
+  const [deleting, setDeleting] = useState<Draft | null>(null);
 
   async function handleSave() {
     if (!editing) return;
@@ -131,6 +138,18 @@ export function UsersClient() {
         title={editing?.id ? `Edit ${editing.name}` : 'Add person'}
         footer={
           <>
+            {editing?.id && editing.id !== me?.id ? (
+              <Button
+                variant="ghost"
+                className="text-status-cancelled-ink mr-auto"
+                onClick={() => {
+                  setDeleting(editing);
+                  setEditing(null);
+                }}
+              >
+                Delete person
+              </Button>
+            ) : null}
             <Button variant="secondary" onClick={() => setEditing(null)}>
               Cancel
             </Button>
@@ -215,6 +234,23 @@ export function UsersClient() {
           </div>
         ) : null}
       </Modal>
+
+      <ConfirmDelete
+        open={deleting !== null}
+        subject={deleting?.name ?? 'this person'}
+        isLoading={isDeleting}
+        onCancel={() => setDeleting(null)}
+        onConfirm={async (reason) => {
+          if (!deleting?.id) return;
+          await deleteUser({ id: deleting.id, reason }).unwrap();
+          dispatch(toastPushed(`${deleting.name} deleted`, 'success'));
+          setDeleting(null);
+        }}
+      >
+        They are signed out on every device at once and can no longer log in. Their name stays on
+        every order, bill and audit entry they made. Their phone number can be given to someone new.
+        If they are only away for a while, untick Active instead.
+      </ConfirmDelete>
     </div>
   );
 }

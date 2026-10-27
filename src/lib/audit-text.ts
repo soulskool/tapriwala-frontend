@@ -196,6 +196,28 @@ export function describeAudit(entry: AuditEntry): AuditSentence {
       };
     }
 
+    // ── Two tables, one bill ──
+    case 'session.bill_moved': {
+      const also = Array.isArray(meta.alsoMoved) ? meta.alsoMoved.map(str).filter(Boolean) : [];
+      return {
+        kind: 'Bill',
+        text:
+          `${actor} moved ${str(meta.fromTableCode) || table || 'a table'}'s bill to ${str(meta.toTableCode) || 'another table'}` +
+          (also.length > 0 ? ` (with ${also.join(', ')})` : '') +
+          because(meta),
+      };
+    }
+    case 'session.bill_move_undone': {
+      const from = str(meta.fromTableCode) || table || 'a table';
+      const to = str(meta.toTableCode);
+      return {
+        kind: 'Bill',
+        text: meta.automatic
+          ? `${from} got its own bill back${to ? ` when ${to} was freed without a bill` : ''}`
+          : `${actor} gave ${from} its own bill back${to ? ` (was with ${to})` : ''}${because(meta)}`,
+      };
+    }
+
     // ── Bills ──
     case 'billing.exported': {
       const number = num(after.billNumber);
@@ -231,6 +253,10 @@ export function describeAudit(entry: AuditEntry): AuditSentence {
       }
       return { kind: 'Menu', text: `${actor} edited ${name}` };
     }
+    case 'product.deleted': {
+      const name = str(meta.displayName) || str(before.displayName) || 'an item';
+      return { kind: 'Menu', text: `${actor} deleted ${name} from the menu${because(meta)}` };
+    }
     case 'product.availability_toggled': {
       const name = itemPhrase({ ...meta, quantity: undefined }, names);
       return {
@@ -244,13 +270,43 @@ export function describeAudit(entry: AuditEntry): AuditSentence {
     // ── Table set-up ──
     case 'table.created':
       return { kind: 'Table', text: `${actor} added table ${str(after.code)}` };
-    case 'table.updated':
+    case 'table.updated': {
+      const code = str(after.code);
+      if (before.isActive !== false && after.isActive === false) {
+        return { kind: 'Table', text: `${actor} took table ${code} out of service` };
+      }
+      if (str(before.zone) && str(after.zone) && before.zone !== after.zone) {
+        return {
+          kind: 'Table',
+          text: `${actor} moved table ${code} from ${str(before.zone)} to ${str(after.zone)}`,
+        };
+      }
+      return { kind: 'Table', text: `${actor} edited table ${code}` };
+    }
+    case 'table.deleted':
+      return {
+        kind: 'Table',
+        text: `${actor} deleted table ${str(before.code) || table}${because(meta)}`,
+      };
+
+    // ── Zones ──
+    case 'zone.created':
+      return { kind: 'Table', text: `${actor} added the zone ${str(after.name)}` };
+    case 'zone.updated': {
+      const from = str(before.name);
+      const to = str(after.name);
       return {
         kind: 'Table',
         text:
-          after.isActive === false
-            ? `${actor} took table ${str(after.code)} out of service`
-            : `${actor} edited table ${str(after.code)}`,
+          from && to && from !== to
+            ? `${actor} renamed the zone ${from} to ${to}`
+            : `${actor} changed where ${to || 'a zone'} sits on the floor`,
+      };
+    }
+    case 'zone.deleted':
+      return {
+        kind: 'Table',
+        text: `${actor} deleted the zone ${str(before.name)}${because(meta)}`,
       };
     case 'table.qr_rotated':
       return { kind: 'Table', text: `${actor} issued a new QR code${onTable(entry)}` };
@@ -265,10 +321,23 @@ export function describeAudit(entry: AuditEntry): AuditSentence {
       };
     case 'user.updated':
       return { kind: 'Staff', text: describeUserUpdate(actor, before, after, meta) };
+    case 'user.deleted': {
+      const role = roleName(before.role);
+      return {
+        kind: 'Staff',
+        text: `${actor} deleted ${str(before.name) || 'a staff member'}${role ? ` (${role})` : ''}${because(meta)}`,
+      };
+    }
 
     default:
       return { kind: 'Table', text: `${actor} · ${entry.action}` };
   }
+}
+
+/** `: “reason”` when the person gave one, nothing when they did not. */
+function because(meta: Bag): string {
+  const reason = str(meta.reason).trim();
+  return reason ? `: “${reason}”` : '';
 }
 
 /**

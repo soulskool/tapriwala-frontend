@@ -4,28 +4,31 @@ import { IconPrint } from '@/components/ui/icons';
 import { useState } from 'react';
 
 import { Button } from '@/components/ui/button';
+import { ConfirmDelete } from '@/components/ui/confirm-delete';
 import { SelectField, TextField } from '@/components/ui/field';
 import { ErrorState, LoadingBlock } from '@/components/ui/feedback';
 import { Modal } from '@/components/ui/modal';
 import { useCanWrite } from '@/hooks/use-can-write';
-import { TABLE_ZONES, TABLE_ZONE_VALUES } from '@/lib/constants';
 import type { TableMaster } from '@/lib/types';
 import { cn } from '@/lib/utils';
 import { apiErrorMessage, apiFieldErrors } from '@/store/api/base-query';
 import {
   useCreateTableMutation,
+  useDeleteTableMutation,
   useListTablesQuery,
+  useListZonesQuery,
   useQrSheetQuery,
   useUpdateTableMutation,
 } from '@/store/api/table-api';
 import { useAppDispatch } from '@/store/hooks';
 import { toastPushed } from '@/store/slices/ui-slice';
+import { ZonesManager } from './zones-manager';
 
 type Draft = Partial<TableMaster>;
 
 const EMPTY_DRAFT: Draft = {
   code: '',
-  zone: TABLE_ZONES.MIDDLE,
+  zoneId: '',
   displayOrder: 1,
   seatingCapacity: 4,
 };
@@ -37,6 +40,10 @@ const EMPTY_DRAFT: Draft = {
  * is derived from the table's own code, so there is no "reissue" action here:
  * a damaged or missing sticker is fixed by printing the sheet again, and
  * renaming a table in this form is what changes its URL.
+ *
+ * Zones are managed from here too (the Zones button), and the zone dropdown
+ * lists whatever zones exist now. Delete sits inside the edit dialog, behind a
+ * confirm step; the server refuses it while the table has an open session.
  */
 export function TablesClient() {
   const dispatch = useAppDispatch();
@@ -44,24 +51,38 @@ export function TablesClient() {
 
   const tables = useListTablesQuery({ includeInactive: true });
   const qrSheet = useQrSheetQuery();
+  const zones = useListZonesQuery();
   const [createTable, { isLoading: isCreating }] = useCreateTableMutation();
   const [updateTable, { isLoading: isUpdating }] = useUpdateTableMutation();
+  const [deleteTable, { isLoading: isDeleting }] = useDeleteTableMutation();
 
   const [editing, setEditing] = useState<Draft | null>(null);
   const [formError, setFormError] = useState<unknown>(null);
   const [sheetOpen, setSheetOpen] = useState(false);
+  const [zonesOpen, setZonesOpen] = useState(false);
+  const [deleting, setDeleting] = useState<Draft | null>(null);
+
+  const zoneOptions = (zones.data ?? []).map((zone) => ({ value: zone.id, label: zone.name }));
 
   async function handleSave() {
     if (!editing) return;
     setFormError(null);
 
+    // Only the fields the form edits: `zone` is the server's read-only label.
+    const body: Partial<TableMaster> = {
+      code: editing.code,
+      zoneId: editing.zoneId,
+      displayOrder: editing.displayOrder,
+      seatingCapacity: editing.seatingCapacity,
+      ...(editing._id ? { isActive: editing.isActive } : {}),
+    };
+
     try {
       if (editing._id) {
-        const { _id, ...body } = editing;
-        await updateTable({ id: _id, body }).unwrap();
+        await updateTable({ id: editing._id, body }).unwrap();
         dispatch(toastPushed('Table updated', 'success'));
       } else {
-        await createTable(editing).unwrap();
+        await createTable(body).unwrap();
         dispatch(toastPushed('Table added', 'success'));
       }
       setEditing(null);
@@ -94,7 +115,16 @@ export function TablesClient() {
         </Button>
         {/* The QR sheet is a read, so a view-only admin keeps it. */}
         {canEdit ? (
-          <Button onClick={() => setEditing({ ...EMPTY_DRAFT })}>+ Add table</Button>
+          <>
+            <Button variant="secondary" onClick={() => setZonesOpen(true)}>
+              Zones
+            </Button>
+            <Button
+              onClick={() => setEditing({ ...EMPTY_DRAFT, zoneId: zoneOptions[0]?.value ?? '' })}
+            >
+              + Add table
+            </Button>
+          </>
         ) : null}
       </header>
 
@@ -127,7 +157,7 @@ export function TablesClient() {
                 className={cn('border-line border-b', !table.isActive && 'opacity-50')}
               >
                 <td className="px-3 py-2.5 text-lg font-bold">{table.code}</td>
-                <td className="px-3 py-2.5">{table.zone}</td>
+                <td className="px-3 py-2.5">{table.zone || '—'}</td>
                 <td className="px-3 py-2.5 text-right tabular-nums">{table.displayOrder}</td>
                 <td className="px-3 py-2.5 text-right tabular-nums">{table.seatingCapacity}</td>
                 <td className="px-3 py-2.5">
@@ -165,6 +195,18 @@ export function TablesClient() {
         title={editing?._id ? `Edit ${editing.code}` : 'Add table'}
         footer={
           <>
+            {editing?._id ? (
+              <Button
+                variant="ghost"
+                className="text-status-cancelled-ink mr-auto"
+                onClick={() => {
+                  setDeleting(editing);
+                  setEditing(null);
+                }}
+              >
+                Delete table
+              </Button>
+            ) : null}
             <Button variant="secondary" onClick={() => setEditing(null)}>
               Cancel
             </Button>
@@ -186,11 +228,18 @@ export function TablesClient() {
             />
             <SelectField
               label="Zone"
-              value={editing.zone ?? TABLE_ZONES.MIDDLE}
-              onChange={(event) =>
-                setEditing({ ...editing, zone: event.target.value as TableMaster['zone'] })
+              required
+              hint={zoneOptions.length === 0 ? 'Add a zone first (Zones button)' : undefined}
+              value={editing.zoneId ?? ''}
+              onChange={(event) => setEditing({ ...editing, zoneId: event.target.value })}
+              // A table whose zone is somehow gone shows a prompt instead of
+              // silently pretending to be in the first zone of the list.
+              options={
+                zoneOptions.some((option) => option.value === editing.zoneId)
+                  ? zoneOptions
+                  : [{ value: '', label: 'Choose a zone…' }, ...zoneOptions]
               }
-              options={TABLE_ZONE_VALUES.map((zone) => ({ value: zone, label: zone }))}
+              error={fieldErrors.zoneId}
             />
             <TextField
               label="Display order"
@@ -235,6 +284,25 @@ export function TablesClient() {
           </div>
         ) : null}
       </Modal>
+
+      <ZonesManager open={zonesOpen} onClose={() => setZonesOpen(false)} />
+
+      <ConfirmDelete
+        open={deleting !== null}
+        subject={`table ${deleting?.code ?? ''}`}
+        isLoading={isDeleting}
+        onCancel={() => setDeleting(null)}
+        onConfirm={async (reason) => {
+          if (!deleting?._id) return;
+          await deleteTable({ id: deleting._id, reason }).unwrap();
+          dispatch(toastPushed(`Table ${deleting.code ?? ''} deleted`, 'success'));
+          setDeleting(null);
+        }}
+      >
+        It leaves the floor and the QR sheet, and its sticker stops taking orders. Past sessions and
+        bills on it stay in history. The code {deleting?.code} can be used again for a new table. A
+        table with an open session cannot be deleted — bill it or free it first.
+      </ConfirmDelete>
 
       <Modal
         open={sheetOpen}

@@ -114,6 +114,85 @@ describe('describeAudit', () => {
     expect(text).toBe('system reactivated Cafe Admin');
   });
 
+  it('says who deleted what, and why when they said', () => {
+    const admin = { role: 'admin', userId: 'u9', name: 'Priya' };
+    expect(
+      describeAudit(
+        entry({
+          action: 'table.deleted',
+          actor: admin,
+          tableCode: 'R4',
+          before: { code: 'R4', zone: 'Right' },
+          meta: { reason: 'Table broken' },
+        }),
+      ).text,
+    ).toBe('Priya deleted table R4: “Table broken”');
+    expect(
+      describeAudit(
+        entry({
+          action: 'product.deleted',
+          actor: admin,
+          meta: { productCode: 'BEV002', displayName: 'Cold Coffee', reason: '' },
+        }),
+      ).text,
+    ).toBe('Priya deleted Cold Coffee from the menu');
+    expect(
+      describeAudit(
+        entry({
+          action: 'user.deleted',
+          actor: admin,
+          before: { name: 'Ravi', role: 'super_admin' },
+          meta: {},
+        }),
+      ).text,
+    ).toBe('Priya deleted Ravi (admins)');
+  });
+
+  it('reads zone changes and a table moving between zones', () => {
+    const admin = { role: 'admin', userId: 'u9', name: 'Priya' };
+    expect(
+      describeAudit(
+        entry({
+          action: 'zone.updated',
+          actor: admin,
+          before: { name: 'Lawn' },
+          after: { name: 'Garden' },
+        }),
+      ).text,
+    ).toBe('Priya renamed the zone Lawn to Garden');
+    expect(
+      describeAudit(
+        entry({
+          action: 'table.updated',
+          actor: admin,
+          before: { code: 'O1', zone: 'Lawn', isActive: true },
+          after: { code: 'O1', zone: 'Veranda', isActive: true },
+        }),
+      ).text,
+    ).toBe('Priya moved table O1 from Lawn to Veranda');
+  });
+
+  it('says who moved a table’s bill, and where', () => {
+    expect(
+      describeAudit(
+        entry({
+          action: 'session.bill_moved',
+          tableCode: 'M4',
+          meta: { fromTableCode: 'M4', toTableCode: 'M3', alsoMoved: [], reason: 'One party' },
+        }),
+      ).text,
+    ).toBe("Sumanth moved M4's bill to M3: “One party”");
+    expect(
+      describeAudit(
+        entry({
+          action: 'session.bill_move_undone',
+          tableCode: 'M4',
+          meta: { fromTableCode: 'M4', toTableCode: 'M3', automatic: true },
+        }),
+      ).text,
+    ).toBe('M4 got its own bill back when M3 was freed without a bill');
+  });
+
   it('never prints "undefined" for a row missing its fields', () => {
     for (const action of [
       'round.placed',
@@ -125,6 +204,14 @@ describe('describeAudit', () => {
       'service_request.updated',
       'product.availability_toggled',
       'user.updated',
+      'user.deleted',
+      'table.deleted',
+      'product.deleted',
+      'zone.created',
+      'zone.updated',
+      'zone.deleted',
+      'session.bill_moved',
+      'session.bill_move_undone',
       'something.new',
     ]) {
       const { text } = describeAudit(entry({ action, before: null, after: null, meta: null }));

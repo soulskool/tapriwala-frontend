@@ -54,6 +54,17 @@ export const adminApi = createApi({
       invalidatesTags: ['User'],
     }),
 
+    /** Soft delete: the name stays on every bill and audit row they signed. */
+    deleteUser: builder.mutation<{ id: string; name: string }, { id: string; reason: string }>({
+      query: ({ id, reason }) => ({
+        url: `/admin/users/${id}`,
+        method: 'DELETE',
+        body: { reason },
+      }),
+      transformResponse: unwrap<{ id: string; name: string }>,
+      invalidatesTags: ['User'],
+    }),
+
     /** The scrutiny trail — the answer to "the guest says they never ordered that". */
     listAudit: builder.query<
       Paginated<AuditEntry>,
@@ -139,6 +150,7 @@ export const {
   useListUsersQuery,
   useCreateUserMutation,
   useUpdateUserMutation,
+  useDeleteUserMutation,
   useListAuditQuery,
   useDailySalesQuery,
   useItemSalesQuery,

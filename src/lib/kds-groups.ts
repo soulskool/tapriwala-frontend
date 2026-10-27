@@ -1,4 +1,4 @@
-import { ITEM_STATUS, type TableZone } from '@/lib/constants';
+import { ITEM_STATUS } from '@/lib/constants';
 import type { KdsTicket } from '@/lib/types';
 
 /**
@@ -13,7 +13,7 @@ export interface KdsTableGroup {
   /** The table's open session. A table has one at a time, so this is the key. */
   sessionId: string;
   tableCode: string;
-  zone: TableZone;
+  zone: string;
   /** Oldest round first, so the add-ons read top to bottom in order. */
   tickets: KdsTicket[];
 }

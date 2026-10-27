@@ -72,25 +72,9 @@ export const ROLE_LABEL: Record<Role, string> = {
 
 // ─── Tables ──────────────────────────────────────────────────────────────────
 
-export const TABLE_ZONES = {
-  LEFT: 'Left',
-  MIDDLE: 'Middle',
-  RIGHT: 'Right',
-  VERANDA: 'Veranda',
-  LAWN: 'Lawn',
-} as const;
-
-export type TableZone = (typeof TABLE_ZONES)[keyof typeof TABLE_ZONES];
-export const TABLE_ZONE_VALUES = Object.values(TABLE_ZONES) as TableZone[];
-
-/** Floor order for the live grid, so zones read the way the café is laid out. */
-export const ZONE_DISPLAY_ORDER: TableZone[] = [
-  TABLE_ZONES.LEFT,
-  TABLE_ZONES.MIDDLE,
-  TABLE_ZONES.RIGHT,
-  TABLE_ZONES.VERANDA,
-  TABLE_ZONES.LAWN,
-];
+// Zones are data, not constants: admins manage them on the Tables page and the
+// API serves them from `/zones` in floor order. The backend's
+// DEFAULT_ZONE_NAMES only seeds a database that has none, so it has no mirror.
 
 // ─── Kitchen ─────────────────────────────────────────────────────────────────
 

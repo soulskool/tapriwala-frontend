@@ -29,6 +29,7 @@ const ENTITY_OPTIONS = [
   { value: 'OrderRound', label: 'Orders' },
   { value: 'ProductMaster', label: 'Menu' },
   { value: 'TableMaster', label: 'Tables' },
+  { value: 'Zone', label: 'Zones' },
   { value: 'ServiceRequest', label: 'Requests' },
   { value: 'BillingExport', label: 'Bills' },
   { value: 'User', label: 'Staff' },

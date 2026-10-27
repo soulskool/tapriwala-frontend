@@ -183,6 +183,35 @@ export const sessionApi = createApi({
       ],
     }),
 
+    /**
+     * Two tables, one bill: this table's bill goes on `toTableId`'s. The
+     * kitchen still cooks for this table; only who pays changes.
+     */
+    moveBill: builder.mutation<
+      TableSession,
+      { sessionId: string; toTableId: string; reason?: string }
+    >({
+      query: ({ sessionId, ...body }) => ({
+        url: `/sessions/${sessionId}/move-bill`,
+        method: 'POST',
+        body,
+      }),
+      transformResponse: unwrap<TableSession>,
+      // Every session's detail can change (the payer gains a rider), so all of them.
+      invalidatesTags: ['Session', 'SessionList'],
+    }),
+
+    /** The table gets its own bill back. Refused once the paying bill is generated. */
+    undoBillMove: builder.mutation<TableSession, { sessionId: string }>({
+      query: ({ sessionId }) => ({
+        url: `/sessions/${sessionId}/undo-bill-move`,
+        method: 'POST',
+        body: {},
+      }),
+      transformResponse: unwrap<TableSession>,
+      invalidatesTags: ['Session', 'SessionList'],
+    }),
+
     /** Hold / release a session for manager review after a late cancellation. */
     setSessionReview: builder.mutation<
       TableSession,
@@ -212,5 +241,7 @@ export const {
   useUpdateRoundStatusMutation,
   useCloseSessionMutation,
   useTransferSessionMutation,
+  useMoveBillMutation,
+  useUndoBillMoveMutation,
   useSetSessionReviewMutation,
 } = sessionApi;

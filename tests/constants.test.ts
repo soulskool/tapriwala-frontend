@@ -17,8 +17,6 @@ import {
   SERVICE_REQUEST_TYPE,
   SESSION_STATUS,
   SOCKET_EVENTS,
-  TABLE_ZONES,
-  ZONE_DISPLAY_ORDER,
 } from '@/lib/constants';
 import { ITEM_STATUS_LABEL, SERVICE_REQUEST_LABEL, TILE_STATUS_LABEL } from '@/lib/utils';
 // Icons are React components now, so they live with the components.
@@ -138,16 +136,6 @@ describe('service requests', () => {
       expect(SERVICE_REQUEST_LABEL[type], `no label for "${type}"`).toBeTruthy();
       expect(SERVICE_REQUEST_ICON[type], `no icon for "${type}"`).toBeTruthy();
     }
-  });
-});
-
-describe('zones', () => {
-  it('orders every zone exactly once', () => {
-    // A zone missing here renders after the ordered ones or not at all,
-    // depending on the screen — either way the floor plan stops matching the
-    // room.
-    expect([...ZONE_DISPLAY_ORDER].sort()).toEqual(Object.values(TABLE_ZONES).sort());
-    expect(new Set(ZONE_DISPLAY_ORDER).size).toBe(ZONE_DISPLAY_ORDER.length);
   });
 });
 

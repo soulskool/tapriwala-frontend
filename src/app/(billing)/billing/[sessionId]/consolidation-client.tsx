@@ -479,7 +479,7 @@ export function ConsolidationClient({ sessionId }: { sessionId: string }) {
       >
         <p className="mb-3 text-sm">
           <span className="font-semibold tabular-nums">{formatCurrency(data.total)}</span> will not
-          be collected. A reason is required. It goes on the audit trail with your name.
+          be collected. A reason is required.
         </p>
         <TextAreaField
           label="Reason"

@@ -46,7 +46,10 @@ export function Button({
     <button
       type="button"
       {...props}
-      disabled={disabled ?? isLoading}
+      // Loading always disables, whatever `disabled` says: `disabled ?? isLoading`
+      // let a caller's `disabled={false}` re-enable a button mid-request, and a
+      // double-tap then sent the same action twice.
+      disabled={Boolean(disabled) || isLoading}
       aria-busy={isLoading || undefined}
       className={cn(
         'inline-flex items-center justify-center rounded-xl font-medium transition',

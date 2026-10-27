@@ -20,7 +20,6 @@ import type {
   ServiceRequestStatus,
   ServiceRequestType,
   SessionStatus,
-  TableZone,
   TileStatus,
 } from './constants';
 
@@ -115,10 +114,21 @@ export interface Product extends MenuItem {
 
 // ─── Tables ──────────────────────────────────────────────────────────────────
 
+/** A café zone, as `/zones` lists it — live zones only, in floor order. */
+export interface Zone {
+  id: string;
+  name: string;
+  displayOrder: number;
+  /** Live tables in it. A zone with tables cannot be deleted. */
+  tableCount: number;
+}
+
 export interface TableMaster {
   _id: string;
   code: string;
-  zone: TableZone;
+  zoneId: string;
+  /** The zone's current name, resolved by the server. */
+  zone: string;
   displayOrder: number;
   seatingCapacity: number;
   isActive: boolean;
@@ -128,7 +138,8 @@ export interface TableMaster {
 export interface LiveTableTile {
   tableId: string;
   code: string;
-  zone: TableZone;
+  zoneId: string;
+  zone: string;
   displayOrder: number;
   seatingCapacity: number;
   status: TileStatus;
@@ -136,7 +147,12 @@ export interface LiveTableTile {
   sessionNumber: number | null;
   openedAt: string | null;
   minutesOpen: number;
+  /** Includes every table whose bill was moved onto this one. */
   runningTotal: number;
+  /** This table's bill was moved: the table that pays it. */
+  billWithTableCode: string | null;
+  /** Open tables whose bill was moved onto this one. */
+  billIncludes: string[];
   roundCount: number;
   pendingItemCount: number;
   readyItemCount: number;
@@ -148,7 +164,8 @@ export interface LiveTableTile {
 
 export interface LiveGridResponse {
   tables: LiveTableTile[];
-  zones: TableZone[];
+  /** Zone names that have tiles, in floor order. */
+  zones: string[];
   count: number;
 }
 
@@ -224,7 +241,21 @@ export interface SessionDetail {
   session: TableSession;
   rounds: OrderRound[];
   serviceRequests: ServiceRequest[];
+  /** This table's own orders only — not the tables riding on its bill. */
   totals: Totals;
+  /** Set when this table's bill was moved onto another table's. */
+  billMovedTo: { sessionId: string; tableId: string; tableCode: string } | null;
+  /** Tables whose bill was moved onto this one, with their rounds. */
+  billIncludes: {
+    sessionId: string;
+    tableId: string;
+    tableCode: string;
+    isActive: boolean;
+    rounds: OrderRound[];
+    totals: Totals;
+  }[];
+  /** This table plus every table on its bill — what the bill will charge. */
+  billTotals: Totals;
 }
 
 // ─── Kitchen ─────────────────────────────────────────────────────────────────
@@ -249,7 +280,7 @@ export interface KdsTicket {
   sessionId: string;
   tableId: string;
   tableCode: string;
-  zone: TableZone;
+  zone: string;
   kotId: string;
   roundNumber: number;
   isAddOn: boolean;
@@ -313,6 +344,8 @@ export interface BillingQueueEntry {
   totalRounds: number;
   heldForReview: boolean;
   reviewNote: string;
+  /** Open tables whose bill was moved onto this one ("incl. M4"). */
+  billIncludes: string[];
 }
 
 export interface ConsolidatedLine {
@@ -497,7 +530,7 @@ export interface ExportResult {
 export interface CustomerTable {
   id: string;
   code: string;
-  zone: TableZone;
+  zone: string;
   seatingCapacity: number;
 }
 

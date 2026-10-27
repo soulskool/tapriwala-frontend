@@ -113,6 +113,19 @@ export const menuApi = createApi({
     }),
 
     /**
+     * Soft delete. Rounds and bills already holding the item keep their copy;
+     * every guest's phone drops it through the 86 broadcast.
+     */
+    deleteProduct: builder.mutation<
+      { id: string; productCode: string },
+      { id: string; reason: string }
+    >({
+      query: ({ id, reason }) => ({ url: `/products/${id}`, method: 'DELETE', body: { reason } }),
+      transformResponse: unwrap<{ id: string; productCode: string }>,
+      invalidatesTags: ['Menu', 'Product'],
+    }),
+
+    /**
      * Menu photo upload. Multipart, so no JSON `Content-Type` header — letting
      * the browser set it is what produces the multipart boundary.
      */
@@ -147,6 +160,7 @@ export const {
   useSetAvailabilityMutation,
   useCreateProductMutation,
   useUpdateProductMutation,
+  useDeleteProductMutation,
   useUploadProductImageMutation,
   useDeleteProductImageMutation,
   useAuditCatalogueQuery,

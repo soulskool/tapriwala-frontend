@@ -5,6 +5,7 @@ import { IconDelete, IconProducts } from '@/components/ui/icons';
 import { useRef, useState } from 'react';
 
 import { Button } from '@/components/ui/button';
+import { ConfirmDelete } from '@/components/ui/confirm-delete';
 import { SelectField, TextAreaField, TextField } from '@/components/ui/field';
 import { EmptyState, ErrorState, LoadingBlock } from '@/components/ui/feedback';
 import { Modal } from '@/components/ui/modal';
@@ -16,6 +17,7 @@ import { cn, formatCurrency } from '@/lib/utils';
 import { apiErrorMessage, apiFieldErrors } from '@/store/api/base-query';
 import {
   useCreateProductMutation,
+  useDeleteProductMutation,
   useDeleteProductImageMutation,
   useListProductsQuery,
   useSetAvailabilityMutation,
@@ -79,12 +81,14 @@ export function ProductsClient() {
   const [setAvailability] = useSetAvailabilityMutation();
   const [uploadImage, { isLoading: isUploading }] = useUploadProductImageMutation();
   const [deleteImage] = useDeleteProductImageMutation();
+  const [deleteProduct, { isLoading: isDeleting }] = useDeleteProductMutation();
   // A view-only admin reads the whole menu and changes none of it: no add,
   // no edit, no photo, and the 86 toggle renders as a plain label.
   const canEdit = useCanWrite();
 
   const [editing, setEditing] = useState<Draft | null>(null);
   const [formError, setFormError] = useState<unknown>(null);
+  const [deleting, setDeleting] = useState<Draft | null>(null);
   const fileInputRef = useRef<HTMLInputElement>(null);
   const [imageTargetId, setImageTargetId] = useState<string | null>(null);
 
@@ -378,6 +382,18 @@ export function ProductsClient() {
         description="Product code is what the legacy POS matches on. It cannot be changed after items have been ordered against it."
         footer={
           <>
+            {editing?.id ? (
+              <Button
+                variant="ghost"
+                className="text-status-cancelled-ink mr-auto"
+                onClick={() => {
+                  setDeleting(editing);
+                  setEditing(null);
+                }}
+              >
+                Delete item
+              </Button>
+            ) : null}
             <Button variant="secondary" onClick={() => setEditing(null)}>
               Cancel
             </Button>
@@ -475,6 +491,25 @@ export function ProductsClient() {
           </div>
         ) : null}
       </Modal>
+
+      <ConfirmDelete
+        open={deleting !== null}
+        subject={deleting?.displayName ?? 'this item'}
+        isLoading={isDeleting}
+        onCancel={() => setDeleting(null)}
+        onConfirm={async (reason) => {
+          if (!deleting?.id) return;
+          await deleteProduct({ id: deleting.id, reason }).unwrap();
+          dispatch(
+            toastPushed(`${deleting.displayName ?? 'Item'} deleted from the menu`, 'success'),
+          );
+          setDeleting(null);
+        }}
+      >
+        It disappears from every menu at once, guests&apos; phones included. Orders already sent to
+        the kitchen and bills that include it are not changed. To hide it just for today, use the
+        sold-out switch instead. The code {deleting?.productCode} can be used again later.
+      </ConfirmDelete>
     </div>
   );
 }

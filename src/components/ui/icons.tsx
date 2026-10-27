@@ -2,6 +2,7 @@ import type { IconType } from 'react-icons';
 import {
   LuArmchair,
   LuArrowLeft,
+  LuArrowRightLeft,
   LuBell,
   LuBellOff,
   LuBluetooth,
@@ -85,6 +86,8 @@ export const IconCheck = LuCheck;
 export const IconWarning = LuTriangleAlert;
 export const IconInfo = LuInfo;
 export const IconBill = LuReceiptText;
+/** A table's bill moved onto another table's. */
+export const IconBillMoved = LuArrowRightLeft;
 /** An open service request — a table waiting on a person, not on food. */
 export const IconRequest = LuConciergeBell;
 export const IconSoundOn = LuBell;

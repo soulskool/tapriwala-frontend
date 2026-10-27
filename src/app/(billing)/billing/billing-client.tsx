@@ -39,7 +39,9 @@ export function BillingQueueClient() {
     (tile) =>
       tile.sessionId !== null &&
       tile.status !== SESSION_STATUS.CLOSED &&
-      !waitingIds.has(tile.sessionId),
+      !waitingIds.has(tile.sessionId) &&
+      // Billed at the table that pays, whose card already says "incl. M4".
+      !tile.billWithTableCode,
   );
 
   return (
@@ -165,7 +167,10 @@ function BillingQueueCard({ entry }: { entry: BillingQueueEntry }) {
         <div className="flex items-start justify-between gap-2">
           <div>
             <p className="text-2xl font-bold">{entry.tableCode}</p>
-            <p className="text-ink-muted text-sm">Session #{entry.sessionNumber}</p>
+            <p className="text-ink-muted text-sm">
+              Session #{entry.sessionNumber}
+              {entry.billIncludes.length > 0 ? ` · incl. ${entry.billIncludes.join(', ')}` : ''}
+            </p>
           </div>
           <span className="text-xl font-bold tabular-nums">
             {formatCurrency(entry.runningTotal)}
@@ -205,7 +210,14 @@ function OpenTableCard({ tile }: { tile: LiveTableTile }) {
         className="rounded-card border-line bg-surface hover:border-brand-300 flex h-full items-center justify-between gap-3 border p-3 transition"
       >
         <div>
-          <p className="text-lg font-bold">{tile.code}</p>
+          <p className="text-lg font-bold">
+            {tile.code}
+            {tile.billIncludes.length > 0 ? (
+              <span className="text-ink-muted ml-1.5 text-sm font-normal">
+                incl. {tile.billIncludes.join(', ')}
+              </span>
+            ) : null}
+          </p>
           <p className="text-ink-muted text-sm tabular-nums">
             {formatElapsed(tile.minutesOpen)} · {tile.roundCount} rounds
           </p>

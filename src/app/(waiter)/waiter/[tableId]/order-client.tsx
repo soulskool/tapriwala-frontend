@@ -12,6 +12,7 @@ import { TextAreaField } from '@/components/ui/field';
 import { ErrorState, LoadingBlock } from '@/components/ui/feedback';
 import { Modal } from '@/components/ui/modal';
 import { StatusPill } from '@/components/ui/status-pill';
+import { BillMove } from '@/components/waiter/bill-move';
 import { ItemPicker } from '@/components/waiter/item-picker';
 import { SessionRounds } from '@/components/waiter/session-rounds';
 import { useCart } from '@/hooks/use-cart';
@@ -24,7 +25,7 @@ import {
   type ItemStatus,
 } from '@/lib/constants';
 import type { MenuItem, OrderItem, OrderRound } from '@/lib/types';
-import { IconBack, IconBill } from '@/components/ui/icons';
+import { IconBack, IconBill, IconBillMoved } from '@/components/ui/icons';
 import { formatCurrency, formatElapsed } from '@/lib/utils';
 import { apiErrorMessage } from '@/store/api/base-query';
 import { useStaffMenuQuery } from '@/store/api/menu-api';
@@ -238,14 +239,17 @@ export function TableOrderClient({ tableId }: { tableId: string }) {
   if (!tile) {
     return (
       <ErrorState
-        message="That table is not on the floor plan."
+        message="That table is not on the floor plan any more. It may have been deleted by an admin."
         onRetry={() => void grid.refetch()}
       />
     );
   }
 
   const rounds = detail.data?.rounds ?? [];
-  const totals = detail.data?.totals;
+  // The whole bill when other tables' bills were moved here, so the figure at
+  // the top is what this table will actually be charged.
+  const includedTables = detail.data?.billIncludes ?? [];
+  const totals = includedTables.length > 0 ? detail.data?.billTotals : detail.data?.totals;
   const openRequests = (detail.data?.serviceRequests ?? []).filter(
     (request) => request.status === 'open' || request.status === 'acknowledged',
   );
@@ -278,7 +282,8 @@ export function TableOrderClient({ tableId }: { tableId: string }) {
               <IconBill aria-hidden className="mr-1.5 inline size-4" /> Request bill
             </Button>
           ) : null}
-          {sessionId && canSettleTable ? (
+          {/* A table whose bill moved is billed at the table that pays. */}
+          {sessionId && canSettleTable && !tile.billWithTableCode ? (
             <Button onClick={() => router.push(`/billing/${sessionId}`)}>
               <IconBill aria-hidden className="mr-1.5 inline size-4" />{' '}
               {canAct ? 'Bill this table' : 'View bill'}
@@ -291,6 +296,16 @@ export function TableOrderClient({ tableId }: { tableId: string }) {
           ) : null}
         </div>
       </header>
+
+      {sessionId ? (
+        <BillMove
+          tile={tile}
+          sessionId={sessionId}
+          detail={detail.data}
+          tiles={grid.data?.tables ?? []}
+          canAct={canAct}
+        />
+      ) : null}
 
       {openRequests.length > 0 ? (
         <p className="rounded-card border-status-pending/40 bg-status-pending-soft text-status-pending-ink border px-4 py-2.5 text-sm">
@@ -318,7 +333,14 @@ export function TableOrderClient({ tableId }: { tableId: string }) {
       <div className="grid grid-cols-1 gap-5 lg:grid-cols-2">
         <section aria-label="Running order" className="flex min-w-0 flex-col gap-3">
           <div className="flex items-baseline justify-between">
-            <h2 className="text-lg font-bold">Running order</h2>
+            <h2 className="text-lg font-bold">
+              Running order
+              {includedTables.length > 0 ? (
+                <span className="text-ink-muted ml-2 text-sm font-normal">
+                  incl. {includedTables.map((included) => included.tableCode).join(', ')}
+                </span>
+              ) : null}
+            </h2>
             {totals ? (
               <span className="font-semibold tabular-nums">{formatCurrency(totals.total)}</span>
             ) : null}
@@ -361,6 +383,40 @@ export function TableOrderClient({ tableId }: { tableId: string }) {
               onPrintKot={canPrintKot ? (round) => setPrintTarget(kotFromRound(round)) : undefined}
             />
           )}
+
+          {/* Other tables on this bill. Read-only here: their food goes to
+              their own table, so serving and cancelling happen on its screen. */}
+          {includedTables.map((included) => (
+            <div key={included.sessionId} className="flex flex-col gap-3">
+              <div className="border-status-bill/40 flex flex-wrap items-baseline justify-between gap-2 border-t pt-3">
+                <h3 className="flex items-center gap-1.5 font-bold">
+                  <IconBillMoved aria-hidden className="text-status-bill-ink size-4" />
+                  From {included.tableCode}
+                  <span className="text-ink-muted text-sm font-normal">
+                    · bill moved here{included.isActive ? '' : ' · table closed'}
+                  </span>
+                </h3>
+                <span className="flex items-center gap-3">
+                  <span className="font-semibold tabular-nums">
+                    {formatCurrency(included.totals.total)}
+                  </span>
+                  {included.isActive ? (
+                    <Link
+                      href={`/waiter/${included.tableId}`}
+                      className="text-brand-700 text-sm font-semibold hover:underline"
+                    >
+                      Open {included.tableCode}
+                    </Link>
+                  ) : null}
+                </span>
+              </div>
+              {included.rounds.length > 0 ? (
+                <SessionRounds rounds={included.rounds} />
+              ) : (
+                <p className="text-ink-muted text-sm">Nothing ordered yet.</p>
+              )}
+            </div>
+          ))}
         </section>
 
         {canAct ? (
@@ -454,7 +510,6 @@ export function TableOrderClient({ tableId }: { tableId: string }) {
           value={cancelReason}
           onChange={(event) => setCancelReason(event.target.value)}
           placeholder="e.g. guest changed their mind"
-          hint="Recorded against your name in the audit log."
         />
       </Modal>
 
@@ -516,7 +571,6 @@ export function TableOrderClient({ tableId }: { tableId: string }) {
             placeholder={
               needsFreeReason ? 'e.g. fake order, nobody at the table' : 'Optional, tidying up'
             }
-            hint="Recorded against your name in the audit log, with the amount written off."
           />
 
           <p className="text-ink-muted text-xs">
