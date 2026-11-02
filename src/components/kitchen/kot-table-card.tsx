@@ -2,7 +2,7 @@
 
 import { memo, useState } from 'react';
 
-import { IconPrint, IconWarning } from '@/components/ui/icons';
+import { IconBillMoved, IconPrint, IconWarning } from '@/components/ui/icons';
 import { ElapsedTimer } from '@/components/kitchen/elapsed-timer';
 import { OrderTypePill } from '@/components/ui/order-type-pill';
 import { useElapsedMinutes, urgencyFor } from '@/hooks/use-elapsed';
@@ -69,6 +69,12 @@ function KotTableCardComponent({
             {group.zone}
             {rounds > 1 ? ` · ${rounds} rounds` : null}
           </p>
+          {/* Tables whose bill moved here: their rounds are on this card. */}
+          {group.includes.length > 0 ? (
+            <p className="bg-status-bill-soft text-status-bill-ink mt-1.5 inline-flex items-center gap-1 rounded-full px-2 py-0.5 text-xs font-semibold">
+              <IconBillMoved aria-hidden className="size-3" /> + {group.includes.join(', ')}
+            </p>
+          ) : null}
         </div>
         <ElapsedTimer since={lead.placedAt} className="text-xl" />
       </header>
@@ -78,6 +84,7 @@ function KotTableCardComponent({
           <RoundSection
             key={ticket.roundId}
             ticket={ticket}
+            payerCode={group.tableCode}
             showTimer={rounds > 1}
             busyItemId={busyItemId}
             onItemStatus={onItemStatus}
@@ -100,7 +107,13 @@ function RoundSection({
   onAllReady,
   onPrintKot,
   busyItemId,
-}: Omit<KotTableCardProps, 'group'> & { ticket: KdsTicket; showTimer: boolean }) {
+  payerCode,
+}: Omit<KotTableCardProps, 'group'> & {
+  ticket: KdsTicket;
+  showTimer: boolean;
+  /** The card's table. A round from another table says so. */
+  payerCode: string;
+}) {
   /*
    * Per-item rates stay folded away by default.
    *
@@ -115,9 +128,16 @@ function RoundSection({
 
   return (
     <section
-      aria-label={`Round ${ticket.roundNumber}, KOT ${ticket.kotId}`}
+      aria-label={`${ticket.tableCode} round ${ticket.roundNumber}, KOT ${ticket.kotId}`}
       className="flex flex-col"
     >
+      {/* A moved table's round on the paying table's card: whose order it is. */}
+      {ticket.tableCode !== payerCode ? (
+        <p className="bg-status-bill-soft text-status-bill-ink flex items-center gap-1.5 px-3 py-1 text-sm font-bold">
+          <IconBillMoved aria-hidden className="size-4" /> {ticket.tableCode}&apos;s order · bill
+          with {payerCode}
+        </p>
+      ) : null}
       <div className="bg-surface-sunken flex items-start justify-between gap-2 px-3 py-1.5">
         <div className="min-w-0">
           <div className="flex flex-wrap items-center gap-1.5">

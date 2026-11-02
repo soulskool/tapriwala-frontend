@@ -42,6 +42,14 @@ export interface PrintBlock {
    */
   size?: PrintSize;
   align?: PrintAlign;
+  /**
+   * A QR code printed after the lines, drawn by the printer itself from this
+   * text (`GS ( k`). Sent as the printer's own QR command rather than as a
+   * picture: a picture of a bill QR is ~20 KB, which over Bluetooth's 20-byte
+   * writes is a thousand round trips and half a minute of waiting at the
+   * counter; the command is the text plus a few bytes.
+   */
+  qr?: string;
 }
 
 export interface EncodeOptions {
@@ -50,6 +58,31 @@ export interface EncodeOptions {
   /** Blank lines fed before the cut, so the tear-off misses the text. */
   feedLines?: number;
   cut?: boolean;
+}
+
+/**
+ * Dots per QR module by paper width: 6 on 80 mm (a bill QR is about 70
+ * modules, so ~420 of the 576 dots — roughly 5 cm), 5 on 58 mm (~350 of 384).
+ * Big enough to scan off creased paper from arm's length.
+ */
+export function qrModuleDots(width: number): number {
+  return width >= 42 ? 6 : 5;
+}
+
+/** `GS ( k` for one QR: model 2, module size, error correction M, store, print. */
+function qrCommand(text: string, moduleDots: number): number[] {
+  // ASCII by construction (an EMV payload), but never let a stray byte
+  // through as a command.
+  const data = Array.from(toPrintableAscii(text), (char) => char.charCodeAt(0));
+  const stored = data.length + 3;
+  return [
+    ...[GS, 0x28, 0x6b, 4, 0, 0x31, 0x41, 0x32, 0x00], // model 2
+    ...[GS, 0x28, 0x6b, 3, 0, 0x31, 0x43, moduleDots], // module size
+    ...[GS, 0x28, 0x6b, 3, 0, 0x31, 0x45, 0x31], // error correction M
+    ...[GS, 0x28, 0x6b, stored & 0xff, stored >> 8, 0x31, 0x50, 0x30, ...data], // store
+    ...[GS, 0x28, 0x6b, 3, 0, 0x31, 0x51, 0x30], // print
+    LF,
+  ];
 }
 
 /** `GS ! n` — bit 0 doubles height, bit 4 doubles width. */
@@ -92,6 +125,7 @@ export function encodeEscPos(blocks: PrintBlock[], options: EncodeOptions): Uint
       for (let index = 0; index < text.length; index += 1) bytes.push(text.charCodeAt(index));
       bytes.push(LF);
     }
+    if (block.qr) bytes.push(...qrCommand(block.qr, qrModuleDots(width)));
   }
 
   // Back to defaults before the feed, so the blank lines are normal height.

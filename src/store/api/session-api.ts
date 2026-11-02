@@ -26,7 +26,15 @@ export const sessionApi = createApi({
     sessionDetail: builder.query<SessionDetail, string>({
       query: (id) => `/sessions/${id}`,
       transformResponse: unwrap<SessionDetail>,
-      providesTags: (_result, _error, id) => [{ type: 'Session', id }],
+      // Also tagged with every table whose bill was moved here, so a Ready
+      // from the kitchen or a Served tap on M3 refreshes L5's "From M3" too.
+      providesTags: (result, _error, id) => [
+        { type: 'Session', id },
+        ...(result?.billIncludes ?? []).map((included) => ({
+          type: 'Session' as const,
+          id: included.sessionId,
+        })),
+      ],
     }),
 
     listSessions: builder.query<
@@ -103,7 +111,19 @@ export const sessionApi = createApi({
      */
     updateItemStatus: builder.mutation<
       OrderRound,
-      { roundId: string; itemId: string; status: ItemStatus; reason?: string; sessionId?: string }
+      {
+        roundId: string;
+        itemId: string;
+        status: ItemStatus;
+        reason?: string;
+        sessionId?: string;
+        /**
+         * The paying table's session, when the tap is on another table's round
+         * shown on its screen ("From M3" on L5) — patched too, so the tap
+         * shows at once there rather than after the refetch.
+         */
+        payerSessionId?: string;
+      }
     >({
       query: ({ roundId, itemId, status, reason }) => ({
         url: `/rounds/${roundId}/items/${itemId}`,
@@ -111,23 +131,40 @@ export const sessionApi = createApi({
         body: { status, ...(reason ? { reason } : {}) },
       }),
       transformResponse: unwrap<OrderRound>,
-      async onQueryStarted({ roundId, itemId, status, sessionId }, { dispatch, queryFulfilled }) {
+      async onQueryStarted(
+        { roundId, itemId, status, sessionId, payerSessionId },
+        { dispatch, queryFulfilled },
+      ) {
         if (!sessionId) {
           await queryFulfilled.catch(() => undefined);
           return;
         }
-        const patch = dispatch(
-          sessionApi.util.updateQueryData('sessionDetail', sessionId, (draft) => {
-            const item = draft.rounds
-              .find((round) => round._id === roundId)
-              ?.items.find((line) => line._id === itemId);
-            if (item) item.status = status;
-          }),
-        );
+        const setStatus = (rounds: OrderRound[]) => {
+          const item = rounds
+            .find((round) => round._id === roundId)
+            ?.items.find((line) => line._id === itemId);
+          if (item) item.status = status;
+        };
+        const patches = [
+          dispatch(
+            sessionApi.util.updateQueryData('sessionDetail', sessionId, (draft) =>
+              setStatus(draft.rounds),
+            ),
+          ),
+        ];
+        if (payerSessionId && payerSessionId !== sessionId) {
+          patches.push(
+            dispatch(
+              sessionApi.util.updateQueryData('sessionDetail', payerSessionId, (draft) => {
+                for (const included of draft.billIncludes) setStatus(included.rounds);
+              }),
+            ),
+          );
+        }
         try {
           await queryFulfilled;
         } catch {
-          patch.undo();
+          for (const patch of patches) patch.undo();
         }
       },
       invalidatesTags: (_result, _error, { sessionId }) =>

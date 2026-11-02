@@ -75,6 +75,28 @@ describe('groupTicketsByTable', () => {
   it('returns nothing for an empty board', () => {
     expect(groupTicketsByTable([])).toEqual([]);
   });
+
+  it('puts a moved table’s rounds on the paying table’s card, keeping whose they are', () => {
+    const moved = { ...ticket('m3', 1), billWithTableCode: 'L5' };
+    const groups = groupTicketsByTable([moved, ticket('l5', 1)]);
+
+    expect(groups).toHaveLength(1);
+    expect(groups[0]!.tableCode).toBe('L5');
+    expect(groups[0]!.includes).toEqual(['M3']);
+    // Each round still names its own table, so the note on it can say "M3's order".
+    expect(groups[0]!.tickets.map((entry) => entry.tableCode)).toEqual(['M3', 'L5']);
+  });
+
+  it('gives the paying table a card even when only moved tables have food cooking', () => {
+    const groups = groupTicketsByTable([
+      { ...ticket('m3', 1), billWithTableCode: 'L5' },
+      { ...ticket('m4', 2), billWithTableCode: 'L5' },
+    ]);
+
+    expect(groups.map((group) => group.tableCode)).toEqual(['L5']);
+    expect(groups[0]!.includes).toEqual(['M3', 'M4']);
+    expect(groups[0]!.tickets).toHaveLength(2);
+  });
 });
 
 describe('isTicketAllReady', () => {

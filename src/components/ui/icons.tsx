@@ -3,6 +3,13 @@ import {
   LuArmchair,
   LuArrowLeft,
   LuArrowRightLeft,
+  LuBanknote,
+  LuCreditCard,
+  LuDoorOpen,
+  LuQrCode,
+  LuRefreshCw,
+  LuMap,
+  LuPlus,
   LuBell,
   LuBellOff,
   LuBluetooth,
@@ -86,6 +93,17 @@ export const IconCheck = LuCheck;
 export const IconWarning = LuTriangleAlert;
 export const IconInfo = LuInfo;
 export const IconBill = LuReceiptText;
+/** "Payment taken" — how the guest paid, on the checkout modal. */
+export const IconCash = LuBanknote;
+export const IconUpi = LuQrCode;
+export const IconCard = LuCreditCard;
+/** A bill number made again after the table ordered more. */
+export const IconRefresh = LuRefreshCw;
+/** Freeing a table without charging it. */
+export const IconFreeTable = LuDoorOpen;
+/** The café's zones (Tables page). */
+export const IconZones = LuMap;
+export const IconAdd = LuPlus;
 /** A table's bill moved onto another table's. */
 export const IconBillMoved = LuArrowRightLeft;
 /** An open service request — a table waiting on a person, not on food. */

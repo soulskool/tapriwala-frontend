@@ -146,6 +146,33 @@ body {
   }
 }
 
+/*
+ * A slim scrollbar in the café's own colours, for panels that scroll inside a
+ * rounded box (modal bodies). The browser's default is wide and grey and sits
+ * on the box's edge; this one is thin, rounded, and inset from the corners.
+ */
+@utility thin-scrollbar {
+  scrollbar-width: thin;
+  scrollbar-color: var(--color-brand-200) transparent;
+  &::-webkit-scrollbar {
+    width: 8px;
+    height: 8px;
+  }
+  &::-webkit-scrollbar-track {
+    background: transparent;
+    margin: 6px 0;
+  }
+  &::-webkit-scrollbar-thumb {
+    background-color: var(--color-brand-200);
+    border-radius: 9999px;
+    border: 2px solid transparent;
+    background-clip: content-box;
+  }
+  &::-webkit-scrollbar-thumb:hover {
+    background-color: var(--color-brand-300);
+  }
+}
+
 /* Kitchen tablets are mounted; the board must never bounce-scroll. */
 @utility overscroll-none-y {
   overscroll-behavior-y: none;
@@ -168,6 +195,15 @@ body {
  * with its own styling; this one is the paper.
  */
 .kot-sheet {
+  display: none;
+}
+
+/*
+ * While a dialog is open it shows its own toasts and printer notices (see
+ * Modal); the page's copies would only sit dimmed behind the backdrop as a
+ * second, unreadable stack.
+ */
+body:has(dialog[open]) .page-notice:not(dialog .page-notice) {
   display: none;
 }
 
@@ -220,6 +256,16 @@ body {
       .receipt-sheet *
     ) {
     display: none !important;
+  }
+
+  /*
+   * On screen a dialog is height-capped and only its body scrolls. On paper
+   * that cap would cut a long ticket off at one screenful, so it is lifted.
+   */
+  dialog,
+  dialog .modal-body {
+    max-height: none !important;
+    overflow: visible !important;
   }
 
   /* The dialog is chrome, never paper. Belt and braces for the rule above. */
@@ -337,6 +383,26 @@ body {
     width: 61mm;
     margin: 1mm 0;
     font-size: 13pt;
+    font-weight: 700;
+  }
+  /*
+   * The "Scan & Pay" QR. Centred on the 61mm character grid, not the 70mm
+   * sheet, so it lines up under the dashes above it. 42mm is ~0.6mm a module
+   * for a bill QR — comfortably above what a phone camera needs off thermal
+   * paper, and still short enough not to double the bill's length.
+   */
+  .receipt-qr {
+    display: block;
+    width: 42mm;
+    height: 42mm;
+    margin: 2mm 0 0 9.5mm;
+  }
+
+  .receipt-qr-caption {
+    width: 61mm;
+    margin: 1mm 0 2mm;
+    text-align: center;
+    font-size: 10pt;
     font-weight: 700;
   }
 }

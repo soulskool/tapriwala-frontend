@@ -1,8 +1,9 @@
 import { render } from '@testing-library/react';
-import { afterEach, describe, expect, it, vi } from 'vitest';
+import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 
 import { buildReceiptText, ReceiptSheet } from '@/components/billing/receipt-sheet';
 import { buildKotText } from '@/components/kitchen/kot-sheet';
+import { resetPrinterSettingsCache, STORAGE_KEY } from '@/lib/print/print-settings';
 import { formatDateTime } from '@/lib/utils';
 
 import golden from './print-golden.json';
@@ -43,6 +44,17 @@ afterEach(() => {
 });
 
 describe('HTML receipt is unchanged', () => {
+  // With the UPI QR switched off on the Printer screen, the paper is exactly
+  // what it always was. The QR itself is covered in `upi-qr.test.tsx`.
+  beforeEach(() => {
+    window.localStorage.setItem(STORAGE_KEY, JSON.stringify({ upiQr: false }));
+    resetPrinterSettingsCache();
+  });
+  afterEach(() => {
+    window.localStorage.removeItem(STORAGE_KEY);
+    resetPrinterSettingsCache();
+  });
+
   for (const [name, fixture] of Object.entries(FIXTURES)) {
     it(`renders the ${name} bill exactly as before`, () => {
       const { container } = render(<ReceiptSheet {...fixture} />);

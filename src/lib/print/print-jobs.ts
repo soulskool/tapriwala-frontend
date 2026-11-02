@@ -1,8 +1,13 @@
-import { buildReceiptText, type ReceiptSheetProps } from '@/components/billing/receipt-sheet';
+import {
+  buildReceiptText,
+  scanAndPay,
+  type ReceiptSheetProps,
+} from '@/components/billing/receipt-sheet';
 import { buildKotText, type KotData } from '@/components/kitchen/kot-sheet';
 import { formatDateTime } from '@/lib/utils';
 
 import { charsPerLine, encodeEscPos, type PrintBlock } from './escpos';
+import { isValidEmvQr, receiptUpiQr, SHOP_UPI_QR, type UpiQrMode } from './upi-qr';
 
 /**
  * What a Print button asks for — the same data its HTML sheet renders from.
@@ -27,17 +32,34 @@ const lines = (text: string): string[] => text.split('\n');
  * HTML sheet; at double width only half the columns fit, so it is laid out
  * against that narrower line.
  */
-export function receiptBlocks(receipt: ReceiptSheetProps, width: number): PrintBlock[] {
+export function receiptBlocks(
+  receipt: ReceiptSheetProps,
+  width: number,
+  mode: UpiQrMode = 'off',
+): PrintBlock[] {
   const text = buildReceiptText(receipt, width);
+  const upiQr = receiptUpiQr(receipt, mode);
   const totalWidth = charsPerLine(width, 'double');
-  return [
+  const blocks: PrintBlock[] = [
     { lines: lines(text.body), bold: true },
     {
       lines: [`NET TOTAL${text.netTotal.padStart(totalWidth - 'NET TOTAL'.length)}`],
       bold: true,
       size: 'double',
     },
-    { lines: lines(text.foot), bold: true },
+  ];
+  if (!upiQr) return [...blocks, { lines: lines(text.foot), bold: true }];
+
+  // The QR sits between the tax table and the closing "thank you" line,
+  // which is always the foot's last line.
+  const foot = lines(text.foot);
+  const thanks = foot.pop() ?? '';
+  return [
+    ...blocks,
+    { lines: foot, bold: true },
+    { lines: [], qr: upiQr, align: 'center' },
+    { lines: [scanAndPay(text.netTotal, mode), ''], bold: true, align: 'center' },
+    { lines: [thanks], bold: true },
   ];
 }
 
@@ -59,8 +81,26 @@ export function kotBlocks(kot: KotData, width: number): PrintBlock[] {
  * holds fewer characters per line than chosen, and the owner picks the next
  * width down instead of discovering it on a guest's bill.
  */
-export function testBlocks(modeLabel: string, printedAt: string, width: number): PrintBlock[] {
+export function testBlocks(
+  modeLabel: string,
+  printedAt: string,
+  width: number,
+  upiQr = false,
+): PrintBlock[] {
   const ruler = Array.from({ length: width }, (_, index) => String((index + 1) % 10)).join('');
+  // The standee QR itself, no amount: proves this printer can draw a QR
+  // before a guest's bill depends on it.
+  const qr: PrintBlock[] =
+    upiQr && isValidEmvQr(SHOP_UPI_QR)
+      ? [
+          { lines: [''], qr: SHOP_UPI_QR, align: 'center' },
+          {
+            lines: ['UPI QR test: scan it with GPay.', 'It should show TREAT MEETS.'],
+            bold: true,
+            align: 'center',
+          },
+        ]
+      : [];
   return [
     { lines: ['TEST PRINT', modeLabel], bold: true, size: 'double', align: 'center' },
     {
@@ -77,15 +117,25 @@ export function testBlocks(modeLabel: string, printedAt: string, width: number):
       ],
       bold: true,
     },
+    ...qr,
   ];
 }
 
-export function encodeJob(job: PrintJob, width: number): Uint8Array {
+export interface EncodeJobOptions {
+  /** This device's UPI QR choice (Printer screen). Default off. */
+  upiQr?: UpiQrMode;
+}
+
+export function encodeJob(
+  job: PrintJob,
+  width: number,
+  { upiQr = 'off' }: EncodeJobOptions = {},
+): Uint8Array {
   const blocks =
     job.kind === 'receipt'
-      ? receiptBlocks(job.receipt, width)
+      ? receiptBlocks(job.receipt, width, upiQr)
       : job.kind === 'kot'
         ? kotBlocks(job.kot, width)
-        : testBlocks(job.modeLabel, job.printedAt, width);
+        : testBlocks(job.modeLabel, job.printedAt, width, upiQr !== 'off');
   return encodeEscPos(blocks, { width });
 }

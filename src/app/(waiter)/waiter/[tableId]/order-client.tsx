@@ -4,6 +4,7 @@ import Link from 'next/link';
 import { useRouter } from 'next/navigation';
 import { useState } from 'react';
 
+import { CheckoutModal } from '@/components/billing/checkout-modal';
 import { KotPrintModal } from '@/components/kitchen/kot-print-modal';
 import { kotFromRound, type KotData } from '@/components/kitchen/kot-sheet';
 import { CartDrawer } from '@/components/menu/cart-drawer';
@@ -25,7 +26,7 @@ import {
   type ItemStatus,
 } from '@/lib/constants';
 import type { MenuItem, OrderItem, OrderRound } from '@/lib/types';
-import { IconBack, IconBill, IconBillMoved } from '@/components/ui/icons';
+import { IconBack, IconBill, IconBillMoved, IconPrint } from '@/components/ui/icons';
 import { formatCurrency, formatElapsed } from '@/lib/utils';
 import { apiErrorMessage } from '@/store/api/base-query';
 import { useStaffMenuQuery } from '@/store/api/menu-api';
@@ -101,6 +102,8 @@ export function TableOrderClient({ tableId }: { tableId: string }) {
   );
   const [cancelReason, setCancelReason] = useState('');
   const [freeOpen, setFreeOpen] = useState(false);
+  /** The checkout pop-up — print, payment and close without leaving the floor. */
+  const [checkoutOpen, setCheckoutOpen] = useState(false);
   const [freeReason, setFreeReason] = useState('');
   /**
    * Snapshotted on press, as on the kitchen board: a socket tick landing while
@@ -160,6 +163,7 @@ export function TableOrderClient({ tableId }: { tableId: string }) {
         itemId: item._id,
         status,
         sessionId: round.sessionId,
+        ...(sessionId ? { payerSessionId: sessionId } : {}),
       }).unwrap();
     } catch (error) {
       dispatch(toastPushed(apiErrorMessage(error, 'Could not update that item'), 'error'));
@@ -180,6 +184,7 @@ export function TableOrderClient({ tableId }: { tableId: string }) {
         // Always required by the API — this is the audit trail for a dispute.
         reason: cancelReason.trim(),
         sessionId: cancelTarget.round.sessionId,
+        ...(sessionId ? { payerSessionId: sessionId } : {}),
       }).unwrap();
 
       dispatch(toastPushed('Item cancelled', 'success'));
@@ -284,13 +289,28 @@ export function TableOrderClient({ tableId }: { tableId: string }) {
           ) : null}
           {/* A table whose bill moved is billed at the table that pays. */}
           {sessionId && canSettleTable && !tile.billWithTableCode ? (
-            <Button onClick={() => router.push(`/billing/${sessionId}`)}>
-              <IconBill aria-hidden className="mr-1.5 inline size-4" />{' '}
-              {canAct ? 'Bill this table' : 'View bill'}
-            </Button>
+            <>
+              {/* Straight to the checkout pop-up: print, take payment and
+                  free the table without leaving the floor. */}
+              {canAct ? (
+                <Button
+                  onClick={() => setCheckoutOpen(true)}
+                  leadingIcon={<IconPrint aria-hidden className="size-4" />}
+                >
+                  Print bill
+                </Button>
+              ) : null}
+              <Button
+                variant={canAct ? 'secondary' : 'primary'}
+                onClick={() => router.push(`/billing/${sessionId}`)}
+              >
+                <IconBill aria-hidden className="mr-1.5 inline size-4" />{' '}
+                {canAct ? 'Bill this table' : 'View bill'}
+              </Button>
+            </>
           ) : null}
           {sessionId && canFreeTable ? (
-            <Button variant="danger" onClick={() => setFreeOpen(true)}>
+            <Button variant="danger-outline" onClick={() => setFreeOpen(true)}>
               Free table
             </Button>
           ) : null}
@@ -384,8 +404,10 @@ export function TableOrderClient({ tableId }: { tableId: string }) {
             />
           )}
 
-          {/* Other tables on this bill. Read-only here: their food goes to
-              their own table, so serving and cancelling happen on its screen. */}
+          {/* Other tables on this bill. Served, Cancel and Print KOT work here
+              too, so the waiter running L5's bill never has to switch to M3
+              to finish it. Each round still says it is M3's food, and a closed
+              M3 stays read-only. */}
           {includedTables.map((included) => (
             <div key={included.sessionId} className="flex flex-col gap-3">
               <div className="border-status-bill/40 flex flex-wrap items-baseline justify-between gap-2 border-t pt-3">
@@ -411,7 +433,23 @@ export function TableOrderClient({ tableId }: { tableId: string }) {
                 </span>
               </div>
               {included.rounds.length > 0 ? (
-                <SessionRounds rounds={included.rounds} />
+                <SessionRounds
+                  rounds={included.rounds}
+                  busyItemId={busyItemId}
+                  onItemStatus={
+                    canAct && included.isActive
+                      ? (round, item, status) => void handleItemStatus(round, item, status)
+                      : undefined
+                  }
+                  onCancelItem={
+                    canAct && included.isActive
+                      ? (round, item) => setCancelTarget({ round, item })
+                      : undefined
+                  }
+                  onPrintKot={
+                    canPrintKot ? (round) => setPrintTarget(kotFromRound(round)) : undefined
+                  }
+                />
               ) : (
                 <p className="text-ink-muted text-sm">Nothing ordered yet.</p>
               )}
@@ -478,6 +516,15 @@ export function TableOrderClient({ tableId }: { tableId: string }) {
         onOrderTypeChange={cart.setOrderType}
       />
 
+      <CheckoutModal
+        sessionId={sessionId}
+        open={checkoutOpen}
+        onClose={() => setCheckoutOpen(false)}
+        // Paid or freed, the table is done here: back to the floor, as Free
+        // table does.
+        onSettled={() => router.push('/waiter')}
+      />
+
       <KotPrintModal
         kot={printTarget}
         open={printTarget !== null}
@@ -487,7 +534,12 @@ export function TableOrderClient({ tableId }: { tableId: string }) {
       <Modal
         open={cancelTarget !== null}
         onClose={() => setCancelTarget(null)}
-        title={`Cancel ${cancelTarget?.item.displayName ?? 'item'}?`}
+        // Names the other table when the item is M3's, cancelled from L5.
+        title={`Cancel ${cancelTarget?.item.displayName ?? 'item'}${
+          cancelTarget && cancelTarget.round.tableCode !== tile.code
+            ? ` (${cancelTarget.round.tableCode}'s order)`
+            : ''
+        }?`}
         description="Cancelled items stay in the history and are excluded from the bill. If the kitchen already started it, the session is held for a manager to review."
         footer={
           <>

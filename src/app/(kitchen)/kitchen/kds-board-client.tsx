@@ -205,7 +205,7 @@ export function KdsBoardClient() {
           <div className="grid grid-cols-[repeat(auto-fill,minmax(min(20rem,100%),1fr))] gap-3">
             {tables.map((group) => (
               <KotTableCard
-                key={group.sessionId}
+                key={group.key}
                 group={group}
                 busyItemId={busyItemId}
                 onItemStatus={

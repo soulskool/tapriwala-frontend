@@ -14,13 +14,17 @@ import { toastDismissed, type Toast } from '@/store/slices/ui-slice';
  * must never walk away from a table believing an order went through when it
  * did not, so failures are sticky — only successes time out.
  */
-export function ToastHost() {
+export function ToastHost({ inDialog = false }: { inDialog?: boolean }) {
   const toasts = useAppSelector((state) => state.ui.toasts);
 
   return (
     <div
       aria-live="polite"
-      className="print-hidden pointer-events-none fixed inset-x-0 bottom-4 z-50 flex flex-col items-center gap-2 px-4"
+      className={cn(
+        'print-hidden pointer-events-none fixed inset-x-0 bottom-4 z-50 flex flex-col items-center gap-2 px-4',
+        // The page's copy steps aside while a dialog shows its own (see Modal).
+        !inDialog && 'page-notice',
+      )}
     >
       {toasts.map((toast) => (
         <ToastCard key={toast.id} toast={toast} />

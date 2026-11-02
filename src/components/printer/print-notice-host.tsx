@@ -19,13 +19,15 @@ import { cn } from '@/lib/utils';
  * Cleared on navigation, because its fallback prints the screen it was raised
  * on — from any other screen it would print the wrong page.
  */
-export function PrintNoticeHost() {
+export function PrintNoticeHost({ inDialog = false }: { inDialog?: boolean }) {
   const notice = usePrintNotice();
   const pathname = usePathname();
 
   useEffect(() => {
-    dismissPrintNotice();
-  }, [pathname]);
+    // Only the page's copy follows the route: a dialog's copy mounts when the
+    // dialog opens, and clearing then would wipe a notice raised just before.
+    if (!inDialog) dismissPrintNotice();
+  }, [pathname, inDialog]);
 
   if (!notice) return null;
 
@@ -33,7 +35,12 @@ export function PrintNoticeHost() {
   const Icon = failed ? IconWarning : notice.tone === 'sent' ? IconCheck : IconPrint;
 
   return (
-    <div className="print-hidden pointer-events-none fixed inset-x-0 top-16 z-50 flex justify-center px-4">
+    <div
+      className={cn(
+        'print-hidden pointer-events-none fixed inset-x-0 top-16 z-50 flex justify-center px-4',
+        !inDialog && 'page-notice',
+      )}
+    >
       <div
         role={failed ? 'alert' : 'status'}
         className={cn(

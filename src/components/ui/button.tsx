@@ -2,7 +2,8 @@ import type { ButtonHTMLAttributes, ReactNode } from 'react';
 
 import { cn } from '@/lib/utils';
 
-export type ButtonVariant = 'primary' | 'secondary' | 'ghost' | 'danger' | 'success';
+export type ButtonVariant =
+  'primary' | 'secondary' | 'ghost' | 'danger' | 'danger-outline' | 'success';
 export type ButtonSize = 'sm' | 'md' | 'lg';
 
 interface ButtonProps extends ButtonHTMLAttributes<HTMLButtonElement> {
@@ -20,6 +21,11 @@ const VARIANTS: Record<ButtonVariant, string> = {
     'bg-surface text-ink border border-line hover:bg-surface-muted active:bg-surface-sunken',
   ghost: 'bg-transparent text-ink-muted hover:bg-surface-sunken hover:text-ink',
   danger: 'bg-status-cancelled text-white hover:brightness-95 active:brightness-90 shadow-sm',
+  // A risky action that should not shout: "Free table" sat in solid red next
+  // to the bill buttons and was pressed for paid tables. The confirm step
+  // inside its dialog keeps the solid red.
+  'danger-outline':
+    'bg-surface text-status-cancelled-ink border border-status-cancelled/40 hover:bg-status-cancelled-soft active:bg-status-cancelled-soft',
   success: 'bg-status-ready text-white hover:brightness-95 active:brightness-90 shadow-sm',
 };
 

@@ -268,7 +268,11 @@ export const socketMiddleware: Middleware = (store) => {
       }
     });
 
-    instance.on(SOCKET_EVENTS.TABLE_STATUS, invalidateFloor);
+    instance.on(SOCKET_EVENTS.TABLE_STATUS, (payload?: { billMoved?: boolean }) => {
+      invalidateFloor();
+      // A bill moved or came back: the kitchen cards name the paying table.
+      if (payload?.billMoved) dispatch(kitchenApi.util.invalidateTags(['Queue']));
+    });
   }
 
   return (next) => (action) => {

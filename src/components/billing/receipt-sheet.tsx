@@ -1,12 +1,18 @@
+'use client';
+
+import { usePrinterSettings } from '@/hooks/use-printer';
 import { ORDER_TYPE, ORDER_TYPE_LABEL, type OrderType } from '@/lib/constants';
+import { upiQrMode } from '@/lib/print/print-settings';
+import { qrModules, receiptUpiQr, type UpiQrMode } from '@/lib/print/upi-qr';
 import { formatDateTime } from '@/lib/utils';
 
 /**
  * The 80mm thermal receipt.
  *
  * Hidden on screen and revealed only by `@media print` (see `globals.css`),
- * which is why it is a plain Server Component with no state: printing it is
- * `window.print()` on the page that already has the bill. A device set to
+ * which is why it holds no state: printing it is `window.print()` on the page
+ * that already has the bill. It is a client component only to read this
+ * device's "UPI QR on bills" switch (Printer screen). A device set to
  * print directly (Bluetooth / RawBT — see `lib/print/`) skips this sheet and
  * sends `buildReceiptText` at the printer's own width instead.
  *
@@ -200,6 +206,12 @@ export interface ReceiptSheetProps {
   printedAt: string;
   /** Stamps "DUPLICATE" — a reprint must be distinguishable from the original. */
   isReprint?: boolean;
+  /**
+   * The bill is already paid, so it prints without the "Scan & Pay" QR.
+   * Not the same as `isReprint`: a second copy handed over before paying
+   * still needs the QR.
+   */
+  settled?: boolean;
 }
 
 /** One receipt as text, split where the HTML sheet changes element. */
@@ -332,8 +344,25 @@ export function buildReceiptText(
   };
 }
 
+/**
+ * The line under the QR, on both print paths. With the amount in the QR it
+ * confirms it; with the plain standee QR it tells the guest what to type.
+ */
+export function scanAndPay(netTotalText: string, mode: UpiQrMode): string {
+  return mode === 'standee'
+    ? `SCAN, ENTER Rs.${netTotalText} & PAY`
+    : `SCAN & PAY  Rs.${netTotalText}`;
+}
+
 export function ReceiptSheet(props: ReceiptSheetProps) {
   const text = buildReceiptText(props);
+  const mode = upiQrMode(usePrinterSettings());
+  const upiQr = receiptUpiQr(props, mode);
+
+  // With a QR, it goes between the tax table and the closing "thank you"
+  // line — the same place the direct path prints it.
+  const foot = text.foot.split('\n');
+  const thanks = upiQr ? foot.pop() : undefined;
 
   return (
     <div className="receipt-sheet" aria-hidden>
@@ -344,7 +373,51 @@ export function ReceiptSheet(props: ReceiptSheetProps) {
         <span>{text.netTotal}</span>
       </p>
 
-      <pre className="receipt-body">{text.foot}</pre>
+      <pre className="receipt-body">{foot.join('\n')}</pre>
+
+      {upiQr ? (
+        <>
+          <UpiQrPicture payload={upiQr} />
+          <p className="receipt-qr-caption">{scanAndPay(text.netTotal, mode)}</p>
+          <pre className="receipt-body">{thanks}</pre>
+        </>
+      ) : null}
     </div>
+  );
+}
+
+/**
+ * The QR as one SVG path, one square per dark module, with a two-module
+ * white margin. Vector, so the browser hands the printer sharp edges at
+ * whatever resolution its driver asks for.
+ */
+export function UpiQrPicture({
+  payload,
+  className = 'receipt-qr',
+}: {
+  payload: string;
+  className?: string;
+}) {
+  const modules = qrModules(payload);
+  const margin = 2;
+  const size = modules.length + margin * 2;
+  let path = '';
+  modules.forEach((row, y) =>
+    row.forEach((dark, x) => {
+      if (dark) path += `M${x + margin} ${y + margin}h1v1h-1z`;
+    }),
+  );
+
+  return (
+    <svg
+      className={className}
+      viewBox={`0 0 ${size} ${size}`}
+      shapeRendering="crispEdges"
+      role="img"
+      aria-label="UPI payment QR code"
+    >
+      <rect width={size} height={size} fill="#fff" />
+      <path d={path} fill="#000" />
+    </svg>
   );
 }

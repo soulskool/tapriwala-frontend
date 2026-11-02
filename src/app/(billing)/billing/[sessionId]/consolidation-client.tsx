@@ -4,8 +4,9 @@ import Link from 'next/link';
 import { useRouter } from 'next/navigation';
 import { useState } from 'react';
 
-import { IconBack, IconDownload, IconPrint, IconWarning } from '@/components/ui/icons';
+import { IconBack, IconBill, IconDownload, IconPrint, IconWarning } from '@/components/ui/icons';
 import { BillSummary } from '@/components/billing/bill-summary';
+import { CheckoutModal } from '@/components/billing/checkout-modal';
 import { ConsolidatedLineItem } from '@/components/billing/consolidated-line-item';
 import { ReceiptSheet, type ReceiptSheetProps } from '@/components/billing/receipt-sheet';
 import { Button } from '@/components/ui/button';
@@ -13,43 +14,17 @@ import { TextAreaField } from '@/components/ui/field';
 import { ErrorState, LoadingBlock } from '@/components/ui/feedback';
 import { Modal } from '@/components/ui/modal';
 import { useCanWrite } from '@/hooks/use-can-write';
-import { EXPORT_METHOD, EXPORT_STATUS, SESSION_STATUS } from '@/lib/constants';
+import { receiptFor, useTableBill } from '@/hooks/use-table-bill';
+import { EXPORT_STATUS, SESSION_STATUS } from '@/lib/constants';
+import { countPrint, printKey } from '@/lib/print/print-count';
 import { printDocument } from '@/lib/print/print-document';
 import type { BillingExport } from '@/lib/types';
 import { cn, formatBillTotal, formatCurrency, formatDateTime } from '@/lib/utils';
 import { apiErrorMessage } from '@/store/api/base-query';
-import {
-  downloadBillCsv,
-  useConfirmExportMutation,
-  useConsolidateQuery,
-  useExportBillMutation,
-  useListExportsQuery,
-} from '@/store/api/billing-api';
-import { useCloseSessionMutation, useSessionDetailQuery } from '@/store/api/session-api';
+import { downloadBillCsv } from '@/store/api/billing-api';
+import { useSessionDetailQuery } from '@/store/api/session-api';
 import { useAppDispatch } from '@/store/hooks';
 import { toastPushed } from '@/store/slices/ui-slice';
-
-/**
- * A stable fingerprint of what is being charged for.
- *
- * Sorted, so the order the server happens to return lines in can never make an
- * unchanged bill look changed.
- *
- * Built on subtotal + tax — the exact figure, in paise — and not on `total`.
- * `total` is rounded to the rupee now, but a bill saved before rounding began
- * kept its paisa total, so comparing totals would brand every such bill "out
- * of date" against the very lines it was saved from.
- */
-function signature(
-  lines: { productCode: string; quantity: number; unitPrice: number }[],
-  subtotal: number,
-  tax: number,
-): string {
-  return `${Math.round((subtotal + tax) * 100)}|${lines
-    .map((line) => `${line.productCode}:${line.quantity}:${line.unitPrice}`)
-    .sort()
-    .join(',')}`;
-}
 
 /**
  * The counter screen (§4.4).
@@ -62,54 +37,22 @@ export function ConsolidationClient({ sessionId }: { sessionId: string }) {
   const router = useRouter();
   const dispatch = useAppDispatch();
 
-  const bill = useConsolidateQuery(sessionId);
+  const table = useTableBill(sessionId);
+  const { bill, savedBill, isStale, isExporting, isClosing } = table;
   const detail = useSessionDetailQuery(sessionId);
 
-  /**
-   * The bill already saved for this session, if any.
-   *
-   * Without this the bill number lived only in component state, so a reload —
-   * or opening a closed table from the Billed list — printed a receipt reading
-   * "BILL NO : (not generated)" for a bill that very much had been.
-   */
-  const saved = useListExportsQuery({ sessionId, limit: 1 });
-
-  const [exportBill, { isLoading: isExporting }] = useExportBillMutation();
-  const [confirmExport] = useConfirmExportMutation();
-  const [closeSession, { isLoading: isClosing }] = useCloseSessionMutation();
   // A view-only admin reads, downloads and prints the bill; it never saves,
   // settles or frees one.
   const canAct = useCanWrite();
 
-  const [lastExport, setLastExport] = useState<BillingExport | null>(null);
   const [closeOpen, setCloseOpen] = useState(false);
   const [closeNote, setCloseNote] = useState('');
   const [freeOpen, setFreeOpen] = useState(false);
   const [freeReason, setFreeReason] = useState('');
+  /** The one-tap checkout pop-up — the fast path beside the buttons below. */
+  const [checkoutOpen, setCheckoutOpen] = useState(false);
   const [printCount, setPrintCount] = useState(0);
   const [printedAt, setPrintedAt] = useState<string | null>(null);
-
-  /** What this session has actually been billed as — fresh result, else stored. */
-  const savedBill = lastExport ?? saved.data?.items[0] ?? null;
-
-  /**
-   * Has the table ordered since the bill was saved?
-   *
-   * A saved bill is frozen — that is the point of it — so a guest who adds a
-   * coffee after "Generate bill" leaves the counter holding a bill for the old
-   * total. Taking payment on that charges the wrong amount, which is the worst
-   * bug this screen could have, so the answer to it is computed rather than
-   * left to whoever is at the counter to notice.
-   *
-   * Compared on codes and quantities, not just the total: two items swapped for
-   * two others at the same price is still a different bill.
-   */
-  const isStale = Boolean(
-    savedBill &&
-    bill.data &&
-    signature(savedBill.lineItems, savedBill.subtotal, savedBill.tax) !==
-      signature(bill.data.lines, bill.data.subtotal, bill.data.tax),
-  );
 
   /**
    * Prints the 80mm receipt.
@@ -121,15 +64,24 @@ export function ConsolidationClient({ sessionId }: { sessionId: string }) {
    * `printDocument` decides how: this device's System mode runs the old path
    * (the hidden sheet + `window.print()`), a direct mode sends the same
    * receipt to the printer as ESC/POS. Both count as a print, so the second
-   * one is a DUPLICATE either way.
+   * one is a DUPLICATE either way — and the count is shared with the checkout
+   * modal, so a bill printed in one and again in the other is a DUPLICATE too.
    */
   function handlePrint(receipt: Pick<ReceiptSheetProps, 'bill' | 'billNumber'>) {
     const now = new Date().toISOString();
-    const count = printCount + 1;
+    const count = countPrint(printKey(sessionId, receipt.billNumber));
     setPrintedAt(now);
     setPrintCount(count);
     printDocument(
-      { kind: 'receipt', receipt: { ...receipt, printedAt: now, isReprint: count > 1 } },
+      {
+        kind: 'receipt',
+        receipt: {
+          ...receipt,
+          printedAt: now,
+          isReprint: count > 1,
+          settled: table.isClosed,
+        },
+      },
       () =>
         // Let React paint the frozen timestamp before the browser freezes the page.
         requestAnimationFrame(() => window.print()),
@@ -138,82 +90,17 @@ export function ConsolidationClient({ sessionId }: { sessionId: string }) {
 
   async function handleExport() {
     try {
-      const result = await exportBill({
-        sessionId,
-        // Phase 1 ships Option D: the screen shows exact codes and quantities
-        // for one fast manual pass. Swapping this to `api` or `csv` is the
-        // whole of the Phase 2 change on this screen.
-        method: EXPORT_METHOD.MANUAL_DISPLAY,
-      }).unwrap();
-
-      setLastExport(result.export);
-      dispatch(toastPushed(`Bill ${result.export.billNumber} saved`, 'success'));
+      const record = await table.generate();
+      dispatch(toastPushed(`Bill ${record.billNumber} saved`, 'success'));
     } catch (error) {
       dispatch(toastPushed(apiErrorMessage(error, 'Could not generate the bill'), 'error'));
     }
   }
 
-  /**
-   * Payment taken: save the bill, mark it paid, free the table.
-   *
-   * There is no POS to hand anything to — this portal *is* the bill — so all
-   * three happen on one press rather than making the counter remember to
-   * generate first. Closing without generating used to leave a table with no
-   * saved copy at all, which is the one outcome you can never reconstruct
-   * afterwards.
-   *
-   * `confirmed` no longer means "entered in the legacy POS", because there is
-   * no legacy POS to enter it into. It means the counter took the money and
-   * closed the table, and `confirmedAt` is when. The field and its endpoint are
-   * left alone so a real POS integration can reclaim the original meaning.
-   */
+  /** Payment taken: save the bill, mark it paid, free the table. See `settle`. */
   async function handleClose() {
     try {
-      // A stale bill is discarded rather than paid: the guest ordered after it
-      // was saved, so a new one is generated for what they actually had. The
-      // old bill keeps its number and stays in Billed — nothing is deleted —
-      // it simply never becomes the one marked paid.
-      let record = isStale ? null : savedBill;
-
-      // An empty table has nothing to bill — the server refuses that, and
-      // rightly. It closes with no export, exactly as it always did.
-      if (!record && (bill.data?.lines.length ?? 0) > 0) {
-        const result = await exportBill({
-          sessionId,
-          method: EXPORT_METHOD.MANUAL_DISPLAY,
-        }).unwrap();
-        record = result.export;
-        setLastExport(result.export);
-      }
-
-      /*
-       * Close first, mark paid second — never the other way round.
-       *
-       * The server refuses to close a table the kitchen has not finished, so
-       * this call really can fail. Confirming first meant a failed close left
-       * behind a bill stamped *paid* against a table that was still open and
-       * still owed food. Ordered this way the worst case is a bill saved but
-       * not settled, which reads correctly on every screen and is fixed by
-       * pressing the button again.
-       */
-      await closeSession({
-        sessionId,
-        ...(record ? { billingExportId: record._id } : {}),
-        ...(closeNote.trim() ? { note: closeNote.trim() } : {}),
-        // A session held for manager review needs an explicit override, so the
-        // discrepancy is acknowledged rather than absorbed.
-        ...(bill.data?.requiresReview ? { force: true } : {}),
-      }).unwrap();
-
-      if (record && record.exportStatus !== EXPORT_STATUS.CONFIRMED) {
-        record = await confirmExport({
-          id: record._id,
-          exportStatus: EXPORT_STATUS.CONFIRMED,
-          ...(closeNote.trim() ? { note: closeNote.trim() } : {}),
-        }).unwrap();
-        setLastExport(record);
-      }
-
+      const record = await table.settle({ note: closeNote });
       dispatch(
         toastPushed(
           record ? `Bill ${record.billNumber} saved · table closed` : 'Table closed and free',
@@ -234,19 +121,11 @@ export function ConsolidationClient({ sessionId }: { sessionId: string }) {
    * out, is the moment you are staring at their bill wondering why nobody is
    * paying it. Deliberately kept separate from "Payment taken" so that
    * "nobody paid" can never be recorded as revenue.
-   *
-   * Closes with `force` and no export id, which is what makes the backend write
-   * off whatever the kitchen still had open and clear the ticket off the board.
    */
   async function handleFree() {
     if (!freeReason.trim()) return;
     try {
-      await closeSession({
-        sessionId,
-        force: true,
-        note: `Freed without billing: ${freeReason.trim()}`,
-      }).unwrap();
-
+      await table.free(freeReason);
       dispatch(
         toastPushed(`${bill.data?.tableCode ?? 'Table'} is free, nothing charged`, 'success'),
       );
@@ -276,10 +155,7 @@ export function ConsolidationClient({ sessionId }: { sessionId: string }) {
    * rounding began they are not, and a reprint must say what the guest was
    * actually charged — ₹451.50, not ₹452.
    */
-  const charged =
-    savedBill && !isStale
-      ? { ...data, total: savedBill.total, roundOff: savedBill.roundOff ?? 0 }
-      : data;
+  const charged = receiptFor(data, table.current).bill;
 
   const isClosed = data.status === SESSION_STATUS.CLOSED;
 
@@ -298,13 +174,18 @@ export function ConsolidationClient({ sessionId }: { sessionId: string }) {
 
   return (
     <div className="flex flex-col gap-5">
-      {/* Screen-invisible; `@media print` is the only thing that reveals it. */}
-      <ReceiptSheet
-        bill={charged}
-        billNumber={isStale ? undefined : savedBill?.billNumber}
-        printedAt={printedAt ?? data.openedAt}
-        isReprint={printCount > 1}
-      />
+      {/* Screen-invisible; `@media print` is the only thing that reveals it.
+          Unmounted while the checkout modal is open: it prints its own sheet,
+          and two mounted sheets would put two bills on one strip of paper. */}
+      {checkoutOpen ? null : (
+        <ReceiptSheet
+          bill={charged}
+          billNumber={isStale ? undefined : savedBill?.billNumber}
+          printedAt={printedAt ?? data.openedAt}
+          isReprint={printCount > 1}
+          settled={isClosed}
+        />
+      )}
 
       <header className="print-hidden flex flex-wrap items-start justify-between gap-3">
         <div>
@@ -318,6 +199,12 @@ export function ConsolidationClient({ sessionId }: { sessionId: string }) {
         </div>
 
         <div className="flex flex-wrap gap-2">
+          <Button
+            onClick={() => setCheckoutOpen(true)}
+            leadingIcon={<IconBill aria-hidden className="size-4" />}
+          >
+            {isClosed ? 'Reprint' : canAct ? 'Checkout' : 'Preview bill'}
+          </Button>
           <Button
             variant="secondary"
             onClick={() =>
@@ -433,10 +320,20 @@ export function ConsolidationClient({ sessionId }: { sessionId: string }) {
             </p>
           ) : (
             <div className="print-hidden flex flex-col gap-2">
+              {/* The fast path: print + payment in one pop-up. The buttons
+                  below are the original step-by-step flow, kept as it was. */}
+              <Button
+                size="lg"
+                fullWidth
+                onClick={() => setCheckoutOpen(true)}
+                leadingIcon={<IconBill aria-hidden className="size-5" />}
+              >
+                Checkout · print &amp; pay
+              </Button>
               <Button variant="success" size="lg" fullWidth onClick={() => setCloseOpen(true)}>
                 Payment taken, close table
               </Button>
-              <Button variant="danger" fullWidth onClick={() => setFreeOpen(true)}>
+              <Button variant="danger-outline" fullWidth onClick={() => setFreeOpen(true)}>
                 Free table without charging
               </Button>
             </div>
@@ -455,6 +352,13 @@ export function ConsolidationClient({ sessionId }: { sessionId: string }) {
           />
         </aside>
       </div>
+
+      <CheckoutModal
+        sessionId={sessionId}
+        open={checkoutOpen}
+        onClose={() => setCheckoutOpen(false)}
+        onSettled={() => router.push('/billing')}
+      />
 
       <Modal
         open={freeOpen}

@@ -1,6 +1,6 @@
 import { describeBluetoothError, printOverBluetooth } from './bluetooth-printer';
 import { encodeJob, type PrintJob } from './print-jobs';
-import { PRINT_MODE, readPrinterSettings } from './print-settings';
+import { PRINT_MODE, readPrinterSettings, upiQrMode } from './print-settings';
 import { sendToRawbt } from './rawbt';
 
 /**
@@ -82,7 +82,7 @@ export function printDocument(job: PrintJob, systemPrint: () => void): void {
 
   let bytes: Uint8Array;
   try {
-    bytes = encodeJob(job, settings.paperChars);
+    bytes = encodeJob(job, settings.paperChars, { upiQr: upiQrMode(settings) });
   } catch {
     fail('Could not prepare this for the printer.', systemPrint);
     return;

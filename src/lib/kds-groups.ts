@@ -10,16 +10,24 @@ import type { KdsTicket } from '@/lib/types';
  * place instead of hunting for the add-on three cards along.
  */
 export interface KdsTableGroup {
-  /** The table's open session. A table has one at a time, so this is the key. */
-  sessionId: string;
+  /** The paying table's code. A table has one open session at a time. */
+  key: string;
+  /** The table that pays: its own card, or the one a bill was moved to. */
   tableCode: string;
+  /** The paying table's zone; blank when only moved tables have food on the board. */
   zone: string;
+  /** Tables whose bill moved here and that have rounds on this card. */
+  includes: string[];
   /** Oldest round first, so the add-ons read top to bottom in order. */
   tickets: KdsTicket[];
 }
 
 /**
- * Groups tickets by table session.
+ * Groups tickets by the table that pays.
+ *
+ * A table whose bill was moved ("M3 → L5") has its rounds on the paying
+ * table's card, so the pass sees one party's food together. Each round still
+ * says whose order it is (see the card), and stays its own cooking job.
  *
  * Cards keep the queue's order (oldest first), placed by their oldest round —
  * so a table that has waited longest stays top-left even after an add-on
@@ -29,21 +37,23 @@ export function groupTicketsByTable(tickets: KdsTicket[]): KdsTableGroup[] {
   const groups = new Map<string, KdsTableGroup>();
 
   for (const ticket of tickets) {
-    const group = groups.get(ticket.sessionId);
-    if (group) {
-      group.tickets.push(ticket);
-    } else {
-      groups.set(ticket.sessionId, {
-        sessionId: ticket.sessionId,
-        tableCode: ticket.tableCode,
-        zone: ticket.zone,
-        tickets: [ticket],
-      });
+    const payer = ticket.billWithTableCode ?? ticket.tableCode;
+    const own = payer === ticket.tableCode;
+    let group = groups.get(payer);
+    if (!group) {
+      group = { key: payer, tableCode: payer, zone: '', includes: [], tickets: [] };
+      groups.set(payer, group);
     }
+    group.tickets.push(ticket);
+    if (own) group.zone = ticket.zone;
+    else if (!group.includes.includes(ticket.tableCode)) group.includes.push(ticket.tableCode);
   }
 
   for (const group of groups.values()) {
-    group.tickets.sort((a, b) => a.roundNumber - b.roundNumber);
+    // By time, not round number: two tables' "R1"s share a card now.
+    group.tickets.sort(
+      (a, b) => a.placedAt.localeCompare(b.placedAt) || a.roundNumber - b.roundNumber,
+    );
   }
   return [...groups.values()];
 }

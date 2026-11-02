@@ -81,6 +81,7 @@ export function CompletedBills() {
           billNumber: bill.billNumber,
           printedAt: now,
           isReprint: true,
+          settled: bill.exportStatus === EXPORT_STATUS.CONFIRMED,
         },
       },
       () => {
@@ -132,6 +133,7 @@ export function CompletedBills() {
           billNumber={printing.billNumber}
           printedAt={printedAt ?? printing.generatedAt}
           isReprint
+          settled={printing.exportStatus === EXPORT_STATUS.CONFIRMED}
         />
       ) : null}
 

@@ -12,6 +12,8 @@
  * printing exactly as it always did.
  */
 
+import type { UpiQrMode } from './upi-qr';
+
 export const PRINT_MODE = {
   /** `window.print()` and the browser's dialog. Needs a driver (Windows). */
   SYSTEM: 'system',
@@ -45,6 +47,34 @@ export interface PrinterSettings {
    * still has the Reconnect button, so the bar is a one-time nudge.
    */
   reconnectBannerHidden?: boolean;
+  /**
+   * Print the "Scan & Pay" UPI QR under a bill's total. On unless someone
+   * switched it off on this device, so it is stored only as `false`; every
+   * other value (absent, unreadable) means on. See `lib/print/upi-qr.ts`.
+   */
+  upiQr?: boolean;
+  /**
+   * Write the bill's amount into that QR, so the guest only taps Pay. Off
+   * prints the plain standee QR and the guest types the amount. On unless
+   * switched off — stored only as `false`, like `upiQr`.
+   */
+  upiQrAmount?: boolean;
+}
+
+/** Whether this device prints the UPI QR on bills. Absent means yes. */
+export function printsUpiQr(settings: PrinterSettings): boolean {
+  return settings.upiQr !== false;
+}
+
+/** Whether that QR has the amount filled in. Absent means yes. */
+export function upiQrHasAmount(settings: PrinterSettings): boolean {
+  return settings.upiQrAmount !== false;
+}
+
+/** Both switches as the one thing the paper needs to know. */
+export function upiQrMode(settings: PrinterSettings): UpiQrMode {
+  if (!printsUpiQr(settings)) return 'off';
+  return upiQrHasAmount(settings) ? 'amount' : 'standee';
 }
 
 export const STORAGE_KEY = 'acd.printer.v1';
@@ -76,6 +106,8 @@ function parse(raw: string | null): PrinterSettings {
       ...(typeof record.deviceName === 'string' ? { deviceName: record.deviceName } : {}),
       ...(typeof record.deviceId === 'string' ? { deviceId: record.deviceId } : {}),
       ...(record.reconnectBannerHidden === true ? { reconnectBannerHidden: true } : {}),
+      ...(record.upiQr === false ? { upiQr: false } : {}),
+      ...(record.upiQrAmount === false ? { upiQrAmount: false } : {}),
     };
   } catch {
     return DEFAULT_PRINTER_SETTINGS;

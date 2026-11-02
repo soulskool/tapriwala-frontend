@@ -289,6 +289,12 @@ export interface KdsTicket {
   orderType: OrderType;
   /** Who sent it — printed on the KOT as the server name. */
   placedByName: string;
+  /**
+   * The table paying for this one when its bill was moved: the card reads
+   * "Bill with L5". The food still goes to `tableCode`. Optional only until
+   * the backend that sends it is live.
+   */
+  billWithTableCode?: string | null;
   placedAt: string;
   elapsedMinutes: number;
   status: RoundStatus;
@@ -391,6 +397,12 @@ export interface ConsolidatedBill {
   orderTypes: OrderType[];
   /** Items were cancelled after cooking started — a manager should look. */
   requiresReview: boolean;
+  /**
+   * Items the kitchen has not finished, across every table on this bill. The
+   * server refuses to close above zero. Optional only until the backend that
+   * sends it is live.
+   */
+  kitchenPendingCount?: number;
 }
 
 /**

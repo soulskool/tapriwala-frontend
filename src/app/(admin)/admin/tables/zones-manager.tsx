@@ -4,9 +4,10 @@ import { useState } from 'react';
 
 import { Button } from '@/components/ui/button';
 import { ConfirmDelete } from '@/components/ui/confirm-delete';
-import { TextField } from '@/components/ui/field';
+import { IconAdd, IconDelete, IconTables, IconZones } from '@/components/ui/icons';
 import { Modal } from '@/components/ui/modal';
 import type { Zone } from '@/lib/types';
+import { cn } from '@/lib/utils';
 import { apiErrorMessage } from '@/store/api/base-query';
 import {
   useCreateZoneMutation,
@@ -18,12 +19,28 @@ import { useAppDispatch } from '@/store/hooks';
 import { toastPushed } from '@/store/slices/ui-slice';
 
 /**
+ * A dot per zone so the list reads at a glance. Decoration only — every row
+ * also carries the zone's name — so the cycle can repeat past five zones.
+ */
+const ZONE_DOTS = [
+  'bg-status-occupied',
+  'bg-status-bill',
+  'bg-status-ready',
+  'bg-status-preparing',
+  'bg-status-served',
+  'bg-status-pending',
+];
+
+const INPUT =
+  'border-line bg-surface focus-visible:border-brand-500 min-h-touch w-full rounded-lg border px-3 text-base outline-none';
+
+/**
  * Add, rename, reorder and delete the café's zones.
  *
  * Tables hold a zone's id, so a rename here reaches every table, the floor,
  * the KDS and the guest's page in one save. A zone with tables in it cannot be
- * deleted — the button says why instead of failing — so no table is ever left
- * without a zone.
+ * deleted — its Delete is disabled and says why on hover — so no table is
+ * ever left without a zone.
  */
 export function ZonesManager({ open, onClose }: { open: boolean; onClose: () => void }) {
   const dispatch = useAppDispatch();
@@ -31,16 +48,27 @@ export function ZonesManager({ open, onClose }: { open: boolean; onClose: () => 
   const [createZone, { isLoading: isCreating }] = useCreateZoneMutation();
   const [deleteZone, { isLoading: isDeleting }] = useDeleteZoneMutation();
 
+  const [adding, setAdding] = useState(false);
   const [newName, setNewName] = useState('');
   const [addError, setAddError] = useState<unknown>(null);
   const [deleting, setDeleting] = useState<Zone | null>(null);
 
+  const list = zones.data ?? [];
+  const tableTotal = list.reduce((sum, zone) => sum + zone.tableCount, 0);
+
+  function stopAdding() {
+    setAdding(false);
+    setNewName('');
+    setAddError(null);
+  }
+
   async function handleAdd() {
+    if (!newName.trim() || isCreating) return;
     setAddError(null);
     try {
       const zone = await createZone({ name: newName.trim() }).unwrap();
       dispatch(toastPushed(`Zone ${zone.name} added`, 'success'));
-      setNewName('');
+      stopAdding();
     } catch (error) {
       setAddError(error);
     }
@@ -51,48 +79,89 @@ export function ZonesManager({ open, onClose }: { open: boolean; onClose: () => 
       <Modal
         open={open}
         onClose={onClose}
-        title="Zones"
-        description="The areas the floor is drawn in. Order is left to right on the live floor."
+        size="lg"
+        icon={<IconZones aria-hidden className="size-5" />}
+        title="Manage zones"
+        description="Organise tables into areas and set the order they appear on the live floor."
         footer={
-          <Button variant="secondary" onClick={onClose}>
-            Done
-          </Button>
+          <div className="flex w-full items-center justify-between gap-2">
+            <Button variant="secondary" onClick={() => setAdding(true)} disabled={adding}>
+              <IconAdd aria-hidden className="size-4" /> Add zone
+            </Button>
+            <Button onClick={onClose}>Done</Button>
+          </div>
         }
       >
         <div className="flex flex-col gap-4">
+          <div className="border-line bg-surface-muted divide-line grid grid-cols-2 divide-x rounded-xl border">
+            <p className="flex items-center gap-2 px-4 py-3 text-sm font-semibold">
+              <IconZones aria-hidden className="text-brand-700 size-4" />
+              {list.length} zone{list.length === 1 ? '' : 's'}
+            </p>
+            <p className="flex items-center gap-2 px-4 py-3 text-sm font-semibold">
+              <IconTables aria-hidden className="text-brand-700 size-4" />
+              {tableTotal} table{tableTotal === 1 ? '' : 's'}
+            </p>
+          </div>
+
           {zones.isError ? (
             <p role="alert" className="text-status-cancelled-ink text-sm">
               {apiErrorMessage(zones.error, 'Could not load the zones')}
             </p>
           ) : null}
 
-          <ul className="flex flex-col gap-2">
-            {(zones.data ?? []).map((zone) => (
-              <ZoneRow key={zone.id} zone={zone} onDelete={() => setDeleting(zone)} />
+          {adding ? (
+            <form
+              className="border-brand-300 bg-brand-50 flex flex-col gap-2 rounded-xl border-2 border-dashed p-4"
+              onSubmit={(event) => {
+                event.preventDefault();
+                void handleAdd();
+              }}
+            >
+              <label htmlFor="new-zone" className="text-sm font-semibold">
+                New zone name
+              </label>
+              <div className="flex flex-wrap gap-2">
+                <input
+                  id="new-zone"
+                  autoFocus
+                  maxLength={40}
+                  placeholder="e.g. Rooftop"
+                  value={newName}
+                  onChange={(event) => setNewName(event.target.value)}
+                  className={cn(INPUT, 'min-w-40 flex-1')}
+                />
+                <Button type="submit" isLoading={isCreating} disabled={!newName.trim()}>
+                  Add
+                </Button>
+                <Button variant="ghost" onClick={stopAdding}>
+                  Cancel
+                </Button>
+              </div>
+              {addError ? (
+                <p role="alert" className="text-status-cancelled-ink text-sm">
+                  {apiErrorMessage(addError, 'Could not add that zone')}
+                </p>
+              ) : null}
+            </form>
+          ) : null}
+
+          {list.length === 0 && !zones.isLoading && !adding ? (
+            <p className="text-ink-muted rounded-xl border border-dashed px-4 py-8 text-center text-sm">
+              No zones yet. Add the first one to start placing tables.
+            </p>
+          ) : null}
+
+          <ul className="flex flex-col gap-3">
+            {list.map((zone, index) => (
+              <ZoneRow
+                key={zone.id}
+                zone={zone}
+                dot={ZONE_DOTS[index % ZONE_DOTS.length]!}
+                onDelete={() => setDeleting(zone)}
+              />
             ))}
           </ul>
-
-          <form
-            className="border-line flex items-end gap-2 border-t pt-4"
-            onSubmit={(event) => {
-              event.preventDefault();
-              if (newName.trim()) void handleAdd();
-            }}
-          >
-            <div className="flex-1">
-              <TextField
-                label="New zone"
-                placeholder="e.g. Rooftop"
-                maxLength={40}
-                value={newName}
-                onChange={(event) => setNewName(event.target.value)}
-                error={addError ? apiErrorMessage(addError, 'Could not add that zone') : undefined}
-              />
-            </div>
-            <Button type="submit" isLoading={isCreating} disabled={!newName.trim()}>
-              Add
-            </Button>
-          </form>
         </div>
       </Modal>
 
@@ -116,7 +185,7 @@ export function ZonesManager({ open, onClose }: { open: boolean; onClose: () => 
 }
 
 /** One zone: rename and reorder in place, delete when it is empty. */
-function ZoneRow({ zone, onDelete }: { zone: Zone; onDelete: () => void }) {
+function ZoneRow({ zone, dot, onDelete }: { zone: Zone; dot: string; onDelete: () => void }) {
   const dispatch = useAppDispatch();
   const [updateZone, { isLoading }] = useUpdateZoneMutation();
   const [name, setName] = useState(zone.name);
@@ -124,8 +193,10 @@ function ZoneRow({ zone, onDelete }: { zone: Zone; onDelete: () => void }) {
   const [error, setError] = useState<unknown>(null);
 
   const dirty = name.trim() !== zone.name || Number(order) !== zone.displayOrder;
+  const inUse = zone.tableCount > 0;
 
   async function handleSave() {
+    if (!dirty || isLoading) return;
     setError(null);
     try {
       await updateZone({
@@ -138,30 +209,39 @@ function ZoneRow({ zone, onDelete }: { zone: Zone; onDelete: () => void }) {
     }
   }
 
-  const inUse = zone.tableCount > 0;
-
   return (
-    <li className="border-line rounded-lg border p-2.5">
-      <div className="flex flex-wrap items-end gap-2">
-        <div className="min-w-32 flex-1">
-          <TextField
-            label="Name"
+    <li className="border-line bg-surface rounded-xl border p-4 shadow-sm transition hover:shadow-md">
+      <p className="mb-3 flex items-center gap-2 font-semibold">
+        <span aria-hidden className={cn('size-2.5 rounded-full', dot)} />
+        {zone.name}
+      </p>
+
+      <div className="grid grid-cols-[1fr_5.5rem] items-end gap-3 sm:grid-cols-[1fr_5.5rem_auto_auto_auto]">
+        <label className="flex flex-col gap-1">
+          <span className="text-ink-muted text-xs font-medium">Name</span>
+          <input
             maxLength={40}
             value={name}
             onChange={(event) => setName(event.target.value)}
+            className={INPUT}
           />
-        </div>
-        <div className="w-20">
-          <TextField
-            label="Order"
+        </label>
+        <label className="flex flex-col gap-1">
+          <span className="text-ink-muted text-xs font-medium">Order</span>
+          <input
             type="number"
             min={0}
             value={order}
             onChange={(event) => setOrder(event.target.value)}
+            className={cn(INPUT, 'tabular-nums')}
           />
-        </div>
+        </label>
+
+        <span className="bg-surface-muted text-ink-muted min-h-touch col-span-2 flex items-center justify-center rounded-lg px-3 text-sm font-medium tabular-nums sm:col-span-1">
+          {zone.tableCount} table{zone.tableCount === 1 ? '' : 's'}
+        </span>
+
         <Button
-          size="sm"
           variant="secondary"
           isLoading={isLoading}
           disabled={!dirty || !name.trim()}
@@ -169,23 +249,20 @@ function ZoneRow({ zone, onDelete }: { zone: Zone; onDelete: () => void }) {
         >
           Save
         </Button>
+
         <Button
-          size="sm"
           variant="ghost"
           disabled={inUse}
           onClick={onDelete}
-          title={inUse ? 'Move its tables to another zone first' : undefined}
+          title={inUse ? 'Move its tables to another zone before deleting' : undefined}
+          className="border-status-cancelled/40 text-status-cancelled-ink hover:bg-status-cancelled-soft border"
         >
-          Delete
+          <IconDelete aria-hidden className="size-4" /> Delete
         </Button>
       </div>
-      <p className="text-ink-muted mt-1.5 text-xs">
-        {inUse
-          ? `${zone.tableCount} table${zone.tableCount === 1 ? '' : 's'} — move them to another zone before deleting`
-          : 'No tables'}
-      </p>
+
       {error ? (
-        <p role="alert" className="text-status-cancelled-ink mt-1 text-sm">
+        <p role="alert" className="text-status-cancelled-ink mt-2 text-sm">
           {apiErrorMessage(error, 'Could not save that zone')}
         </p>
       ) : null}

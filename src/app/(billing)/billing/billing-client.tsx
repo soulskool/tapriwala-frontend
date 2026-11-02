@@ -3,9 +3,11 @@
 import Link from 'next/link';
 import { useState } from 'react';
 
+import { CheckoutModal } from '@/components/billing/checkout-modal';
 import { CompletedBills } from '@/components/billing/completed-bills';
 import { EmptyState, ErrorState, LoadingBlock } from '@/components/ui/feedback';
 import { StatusPill } from '@/components/ui/status-pill';
+import { useCanWrite } from '@/hooks/use-can-write';
 import { SESSION_STATUS } from '@/lib/constants';
 import type { BillingQueueEntry, LiveTableTile } from '@/lib/types';
 import { IconBill, IconCheck, IconWarning } from '@/components/ui/icons';
@@ -31,6 +33,13 @@ export function BillingQueueClient() {
   const [tab, setTab] = useState<Tab>('live');
   const queue = useBillingQueueQuery();
   const grid = useLiveGridQuery();
+  /**
+   * The table whose checkout pop-up is open. Opened straight from a card, so
+   * the counter can print and take payment without leaving this list.
+   */
+  const [checkoutId, setCheckoutId] = useState<string | null>(null);
+  const canAct = useCanWrite();
+  const onCheckout = canAct ? setCheckoutId : undefined;
 
   const waiting = queue.data?.sessions ?? [];
   const waitingIds = new Set(waiting.map((entry) => entry.sessionId));
@@ -61,6 +70,12 @@ export function BillingQueueClient() {
       </div>
 
       {tab === 'completed' ? <CompletedBills /> : <LiveTab />}
+
+      <CheckoutModal
+        sessionId={checkoutId}
+        open={checkoutId !== null}
+        onClose={() => setCheckoutId(null)}
+      />
     </div>
   );
 
@@ -94,7 +109,7 @@ export function BillingQueueClient() {
           ) : (
             <ul className="grid gap-2.5 sm:grid-cols-2 xl:grid-cols-3">
               {waiting.map((entry) => (
-                <BillingQueueCard key={entry.sessionId} entry={entry} />
+                <BillingQueueCard key={entry.sessionId} entry={entry} onCheckout={onCheckout} />
               ))}
             </ul>
           )}
@@ -113,7 +128,7 @@ export function BillingQueueClient() {
           ) : (
             <ul className="grid gap-2.5 sm:grid-cols-2 xl:grid-cols-4">
               {otherOpen.map((tile) => (
-                <OpenTableCard key={tile.tableId} tile={tile} />
+                <OpenTableCard key={tile.tableId} tile={tile} onCheckout={onCheckout} />
               ))}
             </ul>
           )}
@@ -151,19 +166,27 @@ function TabButton({
   );
 }
 
-function BillingQueueCard({ entry }: { entry: BillingQueueEntry }) {
+/** Opens the checkout pop-up for a session. Absent for a view-only admin. */
+type OnCheckout = ((sessionId: string) => void) | undefined;
+
+function BillingQueueCard({
+  entry,
+  onCheckout,
+}: {
+  entry: BillingQueueEntry;
+  onCheckout: OnCheckout;
+}) {
   // Ten minutes at the counter with a card in hand is a long time.
   const overdue = entry.waitingMinutes >= 10;
 
   return (
-    <li>
-      <Link
-        href={`/billing/${entry.sessionId}`}
-        className={cn(
-          'rounded-card bg-surface flex h-full flex-col gap-2 border-2 p-4 transition hover:shadow-md',
-          overdue ? 'animate-pulse-attention border-status-cancelled' : 'border-status-bill',
-        )}
-      >
+    <li
+      className={cn(
+        'rounded-card bg-surface flex h-full flex-col overflow-hidden border-2 transition hover:shadow-md',
+        overdue ? 'animate-pulse-attention border-status-cancelled' : 'border-status-bill',
+      )}
+    >
+      <Link href={`/billing/${entry.sessionId}`} className="flex flex-1 flex-col gap-2 p-4">
         <div className="flex items-start justify-between gap-2">
           <div>
             <p className="text-2xl font-bold">{entry.tableCode}</p>
@@ -198,16 +221,30 @@ function BillingQueueCard({ entry }: { entry: BillingQueueEntry }) {
           </p>
         ) : null}
       </Link>
+
+      {onCheckout ? (
+        <div className="border-line bg-surface-muted border-t px-3 py-2.5">
+          <button
+            type="button"
+            onClick={() => onCheckout(entry.sessionId)}
+            className="bg-status-ready shadow-status-ready/25 min-h-touch flex w-full items-center justify-center gap-2 rounded-xl px-4 font-semibold text-white shadow-md transition hover:brightness-105 active:scale-[0.99]"
+          >
+            <IconBill aria-hidden className="size-4" /> Checkout · print &amp; pay
+          </button>
+        </div>
+      ) : null}
     </li>
   );
 }
 
-function OpenTableCard({ tile }: { tile: LiveTableTile }) {
+function OpenTableCard({ tile, onCheckout }: { tile: LiveTableTile; onCheckout: OnCheckout }) {
+  const sessionId = tile.sessionId;
+
   return (
-    <li>
+    <li className="rounded-card border-line bg-surface hover:border-brand-300 flex h-full items-stretch overflow-hidden border transition">
       <Link
-        href={`/billing/${tile.sessionId}`}
-        className="rounded-card border-line bg-surface hover:border-brand-300 flex h-full items-center justify-between gap-3 border p-3 transition"
+        href={`/billing/${sessionId}`}
+        className="flex min-w-0 flex-1 items-center justify-between gap-3 p-3"
       >
         <div>
           <p className="text-lg font-bold">
@@ -227,6 +264,19 @@ function OpenTableCard({ tile }: { tile: LiveTableTile }) {
           <StatusPill status={tile.status} kind="tile" />
         </div>
       </Link>
+
+      {onCheckout && sessionId ? (
+        <button
+          type="button"
+          onClick={() => onCheckout(sessionId)}
+          aria-label={`Checkout ${tile.code}`}
+          title="Checkout · print & pay"
+          className="border-line bg-surface-muted text-status-ready-ink hover:bg-status-ready-soft flex w-14 shrink-0 flex-col items-center justify-center gap-0.5 border-l text-[0.7rem] font-semibold transition"
+        >
+          <IconBill aria-hidden className="size-5" />
+          Bill
+        </button>
+      ) : null}
     </li>
   );
 }

@@ -25,6 +25,8 @@ import { printDocument } from '@/lib/print/print-document';
 import {
   PAPER_CHARS,
   PRINT_MODE,
+  printsUpiQr,
+  upiQrHasAmount,
   writePrinterSettings,
   type PaperChars,
   type PrintMode,
@@ -283,6 +285,12 @@ export function PrinterClient() {
         </Section>
       )}
 
+      <UpiQrSection
+        on={printsUpiQr(settings)}
+        withAmount={upiQrHasAmount(settings)}
+        onChange={(patch) => writePrinterSettings(patch)}
+      />
+
       {/* ── Step 2 ─────────────────────────────────────────────────────── */}
       <Section step="Step 2" title="Does your printer support “Bluetooth Low Energy”?">
         <p className="mb-2 text-sm">Look at the printer’s label, box or manual:</p>
@@ -425,6 +433,119 @@ function Section({ step, title, children }: { step?: string; title: string; chil
       </h2>
       {children}
     </section>
+  );
+}
+
+/**
+ * "Scan & Pay" QR on bills. Two switches, both on unless switched off here,
+ * and per device like every other choice on this screen: the laptop and the
+ * tablet each keep their own (`localStorage`, see `print-settings.ts`).
+ */
+function UpiQrSection({
+  on,
+  withAmount,
+  onChange,
+}: {
+  on: boolean;
+  withAmount: boolean;
+  onChange: (patch: { upiQr?: boolean; upiQrAmount?: boolean }) => void;
+}) {
+  return (
+    <Section title="UPI QR on bills">
+      <p className="text-sm">
+        A <span className="font-semibold">Scan &amp; Pay</span> QR printed under the bill total. The
+        guest scans it with GPay, PhonePe or Paytm. The money goes to the same HDFC account as the
+        counter standee, and shows in the Vyapar app the same way.
+      </p>
+
+      <div className="mt-3 flex flex-col gap-3">
+        <SettingSwitch
+          label="Print UPI QR on bills"
+          on={on}
+          onToggle={() => onChange({ upiQr: !on })}
+          onText="Every bill prints the QR, on every printer this device uses."
+          offText="Bills print as before, with no QR."
+        />
+        <SettingSwitch
+          label="Amount filled in"
+          on={withAmount}
+          disabled={!on}
+          onToggle={() => onChange({ upiQrAmount: !withAmount })}
+          onText="The bill total is inside the QR. The guest scans and only taps Pay, so nobody types a wrong amount. Under the QR: “SCAN & PAY Rs.294”."
+          offText="The QR is the plain standee QR. The guest scans and types the amount themselves. Under the QR: “SCAN, ENTER Rs.294 & PAY”."
+        />
+      </div>
+
+      <ul className="text-ink-muted mt-3 list-disc pl-5 text-xs">
+        <li>Paid bills reprint without a QR, so nobody pays twice.</li>
+        <li>KOTs never carry a QR.</li>
+        <li>
+          Saved on <span className="text-ink font-semibold">this device only</span>. Set it on the
+          counter laptop and on the tablet separately.
+        </li>
+        <li>
+          Changed it? Press <span className="font-semibold">Test print</span> above and scan the QR
+          on the paper with GPay to check.
+        </li>
+      </ul>
+    </Section>
+  );
+}
+
+function SettingSwitch({
+  label,
+  on,
+  disabled = false,
+  onToggle,
+  onText,
+  offText,
+}: {
+  label: string;
+  on: boolean;
+  disabled?: boolean;
+  onToggle: () => void;
+  onText: string;
+  offText: string;
+}) {
+  return (
+    <div
+      className={cn(
+        'border-line flex items-start justify-between gap-4 rounded-lg border p-3',
+        disabled && 'opacity-50',
+      )}
+    >
+      <div className="text-sm">
+        <p className="font-semibold">{label}</p>
+        <p className="text-ink-muted mt-0.5">
+          {disabled ? 'Turn on the QR first.' : on ? onText : offText}
+        </p>
+      </div>
+      <button
+        type="button"
+        role="switch"
+        aria-checked={on}
+        aria-label={label}
+        disabled={disabled}
+        onClick={onToggle}
+        className={cn(
+          'min-h-touch flex shrink-0 items-center gap-2 rounded-full border px-3 text-sm font-semibold',
+          on
+            ? 'border-brand-600 bg-brand-600 text-white'
+            : 'border-line bg-surface text-ink-muted hover:bg-surface-muted',
+        )}
+      >
+        <span
+          aria-hidden
+          className={cn(
+            'flex h-5 w-9 items-center rounded-full p-0.5 transition-colors',
+            on ? 'justify-end bg-white/30' : 'bg-line justify-start',
+          )}
+        >
+          <span className="size-4 rounded-full bg-white shadow" />
+        </span>
+        {on ? 'On' : 'Off'}
+      </button>
+    </div>
   );
 }
 
