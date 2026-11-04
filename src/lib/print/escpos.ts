@@ -61,13 +61,13 @@ export interface EncodeOptions {
 }
 
 /**
- * Dots per QR module by paper width: 6 on 80 mm (a bill QR is about 70
- * modules, so ~420 of the 576 dots — roughly 5 cm), 5 on 58 mm (~350 of 384).
- * Big enough to scan off creased paper from arm's length.
+ * Dots per QR module: 4 on every paper. A bill QR is about 70 modules, so
+ * ~280 dots — about 3.5 cm at 203 dpi, the same on 80 mm and 58 mm rolls.
+ * (It was 6 on 80 mm, ~5 cm, which the owner found too big.) 4 dots is a
+ * 0.5 mm module, still easy for a phone camera off thermal paper; 3 would be
+ * the first size that starts to fail on a smudged print.
  */
-export function qrModuleDots(width: number): number {
-  return width >= 42 ? 6 : 5;
-}
+const QR_MODULE_DOTS = 4;
 
 /** `GS ( k` for one QR: model 2, module size, error correction M, store, print. */
 function qrCommand(text: string, moduleDots: number): number[] {
@@ -125,7 +125,7 @@ export function encodeEscPos(blocks: PrintBlock[], options: EncodeOptions): Uint
       for (let index = 0; index < text.length; index += 1) bytes.push(text.charCodeAt(index));
       bytes.push(LF);
     }
-    if (block.qr) bytes.push(...qrCommand(block.qr, qrModuleDots(width)));
+    if (block.qr) bytes.push(...qrCommand(block.qr, QR_MODULE_DOTS));
   }
 
   // Back to defaults before the feed, so the blank lines are normal height.

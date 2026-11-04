@@ -929,7 +929,7 @@ function ReceiptPreview({
           <pre className="whitespace-pre">{footLines.join('\n')}</pre>
           {upiQr ? (
             <>
-              <UpiQrPicture payload={upiQr} className="mx-auto mt-2 block size-36" />
+              <UpiQrPicture payload={upiQr} className="mx-auto mt-2 block size-28" />
               <p className="mb-1 text-center font-bold">{scanAndPay(netTotal, qrMode)}</p>
               <pre className="whitespace-pre">{thanks}</pre>
             </>

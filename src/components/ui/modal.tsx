@@ -99,8 +99,16 @@ export function Modal({
         </button>
       </div>
 
+      {/*
+       * `flex-auto`, never `flex-1`. The dialog has a max height but no
+       * height, and `flex-1`'s 0% basis made older Safari (macOS) size the
+       * body from zero: every pop-up showed its padding and nothing else —
+       * no table picker in Move bill, no fields in Add item. `auto` starts
+       * from the content's own height and still shrinks to scroll when the
+       * dialog reaches its cap.
+       */}
       {children ? (
-        <div className="modal-body thin-scrollbar min-h-0 flex-1 overflow-y-auto px-5 py-4">
+        <div className="modal-body thin-scrollbar min-h-0 flex-auto overflow-y-auto px-5 py-4">
           {children}
         </div>
       ) : null}

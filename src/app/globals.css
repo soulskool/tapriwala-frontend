@@ -387,15 +387,15 @@ body:has(dialog[open]) .page-notice:not(dialog .page-notice) {
   }
   /*
    * The "Scan & Pay" QR. Centred on the 61mm character grid, not the 70mm
-   * sheet, so it lines up under the dashes above it. 42mm is ~0.6mm a module
-   * for a bill QR — comfortably above what a phone camera needs off thermal
-   * paper, and still short enough not to double the bill's length.
+   * sheet, so it lines up under the dashes above it. 32mm (was 42mm — the
+   * owner found it too big) is ~0.45mm a module for a bill QR: still well
+   * above what a phone camera needs off thermal paper.
    */
   .receipt-qr {
     display: block;
-    width: 42mm;
-    height: 42mm;
-    margin: 2mm 0 0 9.5mm;
+    width: 32mm;
+    height: 32mm;
+    margin: 2mm 0 0 14.5mm;
   }
 
   .receipt-qr-caption {
